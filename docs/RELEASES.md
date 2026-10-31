@@ -16,6 +16,8 @@ Downloads: https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases
 
 GitHub also provides the source archives for each release, including the backend, scripts and Docker deployment configuration. Applications still need a running API server; publishing binary downloads does not deploy the backend or web site.
 
+The web package includes `start-local.cjs`. Run `node start-local.cjs` to bind it only to this computer; use the separate Docker deployment instructions for remote hosting.
+
 ## iOS signing
 
 GitHub's macOS runners can compile iOS applications without your owning a Mac. They cannot create your Apple developer identity or provisioning permission. The unsigned IPA is deliberately labeled, and the simulator bundle cannot run on a physical iPhone.

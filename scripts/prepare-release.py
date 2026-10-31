@@ -60,7 +60,7 @@ The default simulator API address is `http://localhost:8000` on that Mac. Set an
 
 ## Web
 
-Extract `SeviL-web-server.tar.gz`, install Node.js 24, and start the separate SeviL API on `127.0.0.1:8000`. From the extracted folder run `node server.js`; open `http://localhost:3000`. The compiled API proxy targets `http://127.0.0.1:8000`. For a different internal API address, use the documented Docker build argument and rebuild.
+Extract `SeviL-web-server.tar.gz`, install Node.js 24, and start the separate SeviL API on `127.0.0.1:8000`. From the extracted folder run `node start-local.cjs`; open `http://localhost:3000`. This launcher binds the web server only to your own computer. The compiled API proxy targets `http://127.0.0.1:8000`. For remote hosting or a different internal API address, use the documented Docker setup with a server access token and HTTPS, then rebuild.
 
 Local server setup, API credentials, and deployment instructions: [README]({source}/README.md) and [deployment guide]({source}/docs/DEPLOYMENT.md).
 

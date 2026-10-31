@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p release .next/standalone/.next
           cp -R .next/static .next/standalone/.next/static
+          cp ../../.github/release-web-start.cjs .next/standalone/start-local.cjs
           tar -czf release/SeviL-web-server.tar.gz -C .next/standalone .
       - uses: actions/upload-artifact@v4
         with:
