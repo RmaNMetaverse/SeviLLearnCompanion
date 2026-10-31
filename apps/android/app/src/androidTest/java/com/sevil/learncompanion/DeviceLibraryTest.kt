@@ -13,7 +13,7 @@ import android.os.ParcelFileDescriptor
 
 @RunWith(AndroidJUnit4::class)
 class DeviceLibraryTest {
-    @Test fun independentLibraryRetainsOriginalsAndExportsPDF() = runBlocking {
+    @Test fun independentLibraryRetainsOriginalsAndExportsPDF(): Unit = runBlocking {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val api=Api(context)
         val course=JSONObject(api.json("/v1/courses","POST",JSONObject().put("title","Synthetic physics")))

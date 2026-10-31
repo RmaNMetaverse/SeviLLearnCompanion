@@ -14,6 +14,8 @@ Each client has a separate device library and directly contacts its selected AI 
 
 Store a Base64-encoded debug keystore as the repository Actions secret `ANDROID_DEBUG_KEYSTORE_BASE64` to keep the test signing certificate stable. The workflow restores it to the runner's default debug keystore location. Use the standard debug keystore credentials (`android`, alias `androiddebugkey`) for development only. Never commit the keystore or use it for production distribution.
 
+This repository now has that secret configured from the development laptop's existing debug keystore with the owner's explicit approval. Subsequent workflow runs use the same test signing identity. Older builds published before this setup can still have a different signature.
+
 Without the secret, GitHub runners generate different test certificates. Android then rejects an update over the previous build; uninstalling deletes that installation's local library. Export important files first. The local laptop's debug keystore is separate unless the same keystore is configured for GitHub. The build manifest identifies source and build number, not signing continuity.
 
 ## iOS simulator

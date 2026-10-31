@@ -855,6 +855,6 @@ export async function printHandout(id: string) {
     iframe.contentWindow?.print();
     setTimeout(() => iframe.remove(), 60000);
   };
-  document.body.appendChild(iframe);
   iframe.srcdoc = html;
+  document.body.appendChild(iframe);
 }
