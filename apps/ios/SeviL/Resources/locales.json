@@ -69,7 +69,14 @@
     "local": "Personal study workspace",
     "discover": "Find public sources",
     "publicSources": "Public sources",
-    "sourceNotice": "Search summaries supplement your uploaded materials. Verify the linked originals."
+    "sourceNotice": "Search summaries supplement your uploaded materials. Verify the linked originals.",
+    "aiProvider": "AI service",
+    "audioProvider": "Audio service",
+    "providerNotice": "Keys stay on the server. The app never switches services automatically.",
+    "claudeAudioNotice": "Claude uses the selected audio service for transcription, or your saved transcript.",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "generatedWith": "Generated with"
   },
   "tr": {
     "workspace": "Çalışma alanı",
@@ -141,7 +148,14 @@
     "local": "Kişisel çalışma alanı",
     "discover": "Açık kaynakları bul",
     "publicSources": "Açık kaynaklar",
-    "sourceNotice": "Arama özetleri yüklediğiniz materyalleri destekler. Bağlantılı asılları doğrulayın."
+    "sourceNotice": "Arama özetleri yüklediğiniz materyalleri destekler. Bağlantılı asılları doğrulayın.",
+    "aiProvider": "Yapay zekâ hizmeti",
+    "audioProvider": "Ses hizmeti",
+    "providerNotice": "Anahtarlar sunucuda kalır. Uygulama hizmeti kendiliğinden değiştirmez.",
+    "claudeAudioNotice": "Claude, döküm için seçilen ses hizmetini veya kaydedilmiş dökümünüzü kullanır.",
+    "configured": "Yapılandırıldı",
+    "notConfigured": "Yapılandırılmadı",
+    "generatedWith": "Oluşturan hizmet"
   },
   "zh-Hans": {
     "workspace": "学习空间",
@@ -213,7 +227,14 @@
     "local": "个人学习空间",
     "discover": "查找公开资料",
     "publicSources": "公开资料",
-    "sourceNotice": "搜索摘要补充您上传的资料，请核实链接原文。"
+    "sourceNotice": "搜索摘要补充您上传的资料，请核实链接原文。",
+    "aiProvider": "AI 服务",
+    "audioProvider": "音频服务",
+    "providerNotice": "密钥仅保存在服务器上，应用不会自动切换服务。",
+    "claudeAudioNotice": "Claude 使用所选音频服务转录，或使用您保存的文字记录。",
+    "configured": "已配置",
+    "notConfigured": "未配置",
+    "generatedWith": "生成服务"
   },
   "ja": {
     "workspace": "学習スペース",
@@ -285,7 +306,14 @@
     "local": "個人学習スペース",
     "discover": "公開資料を検索",
     "publicSources": "公開資料",
-    "sourceNotice": "検索要約は添付資料を補足します。リンク先の原文を確認してください。"
+    "sourceNotice": "検索要約は添付資料を補足します。リンク先の原文を確認してください。",
+    "aiProvider": "AIサービス",
+    "audioProvider": "音声サービス",
+    "providerNotice": "キーはサーバーに保存されます。サービスは自動で切り替わりません。",
+    "claudeAudioNotice": "Claudeは選択した音声サービスで文字起こしするか、保存済みの文字起こしを使用します。",
+    "configured": "設定済み",
+    "notConfigured": "未設定",
+    "generatedWith": "生成サービス"
   },
   "ko": {
     "workspace": "학습 공간",
@@ -357,7 +385,14 @@
     "local": "개인 학습 공간",
     "discover": "공개 자료 검색",
     "publicSources": "공개 자료",
-    "sourceNotice": "검색 요약은 첨부 자료를 보완합니다. 링크된 원문을 확인하세요."
+    "sourceNotice": "검색 요약은 첨부 자료를 보완합니다. 링크된 원문을 확인하세요.",
+    "aiProvider": "AI 서비스",
+    "audioProvider": "음성 서비스",
+    "providerNotice": "키는 서버에만 저장됩니다. 서비스는 자동으로 바뀌지 않습니다.",
+    "claudeAudioNotice": "Claude는 선택한 음성 서비스로 녹취하거나 저장된 녹취록을 사용합니다.",
+    "configured": "설정됨",
+    "notConfigured": "설정되지 않음",
+    "generatedWith": "생성 서비스"
   },
   "de": {
     "workspace": "Arbeitsbereich",
@@ -429,7 +464,14 @@
     "local": "Persönlicher Lernbereich",
     "discover": "Öffentliche Quellen suchen",
     "publicSources": "Öffentliche Quellen",
-    "sourceNotice": "Suchzusammenfassungen ergänzen Ihre Materialien. Prüfen Sie die verlinkten Originale."
+    "sourceNotice": "Suchzusammenfassungen ergänzen Ihre Materialien. Prüfen Sie die verlinkten Originale.",
+    "aiProvider": "KI-Dienst",
+    "audioProvider": "Audiodienst",
+    "providerNotice": "Schlüssel bleiben auf dem Server. Der Dienst wird nie automatisch gewechselt.",
+    "claudeAudioNotice": "Claude nutzt den gewählten Audiodienst zur Transkription oder Ihr gespeichertes Transkript.",
+    "configured": "Eingerichtet",
+    "notConfigured": "Nicht eingerichtet",
+    "generatedWith": "Erstellt mit"
   },
   "fr": {
     "workspace": "Espace de travail",
@@ -501,7 +543,14 @@
     "local": "Espace d’étude personnel",
     "discover": "Trouver des sources publiques",
     "publicSources": "Sources publiques",
-    "sourceNotice": "Les résumés complètent vos documents. Vérifiez les sources originales."
+    "sourceNotice": "Les résumés complètent vos documents. Vérifiez les sources originales.",
+    "aiProvider": "Service IA",
+    "audioProvider": "Service audio",
+    "providerNotice": "Les clés restent sur le serveur. Aucun changement automatique de service.",
+    "claudeAudioNotice": "Claude utilise le service audio choisi pour la transcription ou votre transcription enregistrée.",
+    "configured": "Configuré",
+    "notConfigured": "Non configuré",
+    "generatedWith": "Généré avec"
   },
   "es": {
     "workspace": "Espacio de estudio",
@@ -573,6 +622,13 @@
     "local": "Espacio de estudio personal",
     "discover": "Buscar fuentes públicas",
     "publicSources": "Fuentes públicas",
-    "sourceNotice": "Los resúmenes complementan tus materiales. Verifica las fuentes originales."
+    "sourceNotice": "Los resúmenes complementan tus materiales. Verifica las fuentes originales.",
+    "aiProvider": "Servicio de IA",
+    "audioProvider": "Servicio de audio",
+    "providerNotice": "Las claves permanecen en el servidor. El servicio nunca cambia automáticamente.",
+    "claudeAudioNotice": "Claude usa el servicio de audio elegido para transcribir o tu transcripción guardada.",
+    "configured": "Configurado",
+    "notConfigured": "Sin configurar",
+    "generatedWith": "Generado con"
   }
 }

@@ -42,6 +42,9 @@ def render(session, course, assets):
     para(note["title"], "Title")
     para(f"{course['title']} · {course['university']} · {course['professor']} · {session['created_at'][:10]}", "Meta")
     if session.get("generated_mode") == "demo": para("DEMONSTRATION — SYNTHETIC CONTENT", "Heading2")
+    elif session.get("generated_provider"):
+        label = {"openai":"OpenAI","gemini":"Gemini","claude":"Claude"}.get(session["generated_provider"],session["generated_provider"])
+        para("Generated with: " + label, "Meta")
     para(note["summary"])
     para("Learning objectives", "Heading1")
     for item in note["objectives"]: para("• " + item)

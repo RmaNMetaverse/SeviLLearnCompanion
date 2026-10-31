@@ -9,6 +9,10 @@ import SwiftUI
     @Published var error = ""
     @Published var busy = false
     @Published var publicSources: [PublicLink] = []
+    @Published var providers: [AIProvider] = []
+    @Published var provider = UserDefaults.standard.string(forKey:"provider") ?? "openai" { didSet { UserDefaults.standard.set(provider,forKey:"provider") } }
+    @Published var audioProvider = UserDefaults.standard.string(forKey:"audioProvider") ?? "gemini" { didSet { UserDefaults.standard.set(audioProvider,forKey:"audioProvider") } }
+    var generationOptions: [String:Any] { ["provider":provider,"transcription_provider":provider == "claude" ? audioProvider : provider] }
     @Published var locale: String = UserDefaults.standard.string(forKey: "locale") ?? "en" {
         didSet { UserDefaults.standard.set(locale, forKey: "locale") }
     }
@@ -23,16 +27,22 @@ import SwiftUI
         async let c: [Course] = api.get("/v1/courses")
         async let s: [LectureSession] = api.get("/v1/sessions")
         async let h: Health = api.get("/health")
-        let result = try await (c, s, h)
+        async let p: ProviderCatalog = api.get("/v1/providers")
+        let result = try await (c, s, h, p)
         courses = result.0; sessions = result.1; mode = result.2.mode
+        providers = result.3.providers
+        if UserDefaults.standard.string(forKey:"provider") == nil { provider = result.3.default_provider }
     }
     func open(_ id: String) async throws {
         active = try await api.get("/v1/sessions/\(id)")
-        if let active { let discovery: Discovery = try await api.get("/v1/courses/\(active.course_id)/sources"); publicSources = discovery.links }
+        try await refreshSources()
+    }
+    func refreshSources() async throws {
+        if let active { let discovery: Discovery = try await api.get("/v1/courses/\(active.course_id)/sources?provider=\(provider)"); publicSources = discovery.links }
     }
     func discover() async throws {
         guard let active else { return }
-        let discovery: Discovery = try await api.get("/v1/courses/\(active.course_id)/discover",method:"POST",json:[:])
+        let discovery: Discovery = try await api.get("/v1/courses/\(active.course_id)/discover",method:"POST",json:["provider":provider])
         publicSources = discovery.links
     }
     func createCourse(_ fields: [String: Any]) async throws -> Course { let course: Course = try await api.get("/v1/courses", method: "POST", json: fields); try await refresh(); return course }
@@ -47,7 +57,7 @@ import SwiftUI
         try await createSession(course: course.id, title: "From listening to understanding", permission: true)
         if mode == "demo" { try await generate() }
     }
-    func generate() async throws { guard let active else { return }; _ = try await api.data("/v1/sessions/\(active.id)/generate", method:"POST", json:[:]); try await open(active.id) }
+    func generate() async throws { guard let active else { return }; _ = try await api.data("/v1/sessions/\(active.id)/generate", method:"POST", json:generationOptions); try await open(active.id) }
     func upload(_ file: URL, kind: String, name: String? = nil, offset: Int = 0, duration: Int = 0) async throws {
         guard let active else { return }
         try await api.upload(session:active.id, file:file, name:name ?? file.lastPathComponent, kind:kind, offset:offset, duration:duration)

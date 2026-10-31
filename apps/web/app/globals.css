@@ -8,6 +8,40 @@
   --bg: #f7f8f4;
   --lavender: #efedf9;
 }
+.provider-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 18px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin: 14px 0 22px;
+}
+.provider-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.provider-bar select {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12px;
+  max-width: 100%;
+}
+.provider-bar p {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+}
 * {
   box-sizing: border-box;
 }

@@ -41,6 +41,12 @@ private val languages = linkedMapOf("en" to "English", "tr" to "Türkçe", "zh-H
 private fun clock(ms: Long) = "%02d:%02d".format(ms / 60000, ms / 1000 % 60)
 
 @Composable
+fun ProviderPicker(label: String, selected: String, choices: Map<String,String>, enabled: Boolean = true, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Column { Text(label, style = MaterialTheme.typography.labelMedium, color = Color.Gray); OutlinedButton(enabled = enabled, onClick = { expanded = true }) { Text(choices[selected] ?: selected) }; DropdownMenu(expanded, onDismissRequest = { expanded = false }) { choices.forEach { (id, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { onSelect(id); expanded = false }) } } }
+}
+
+@Composable
 fun LanguagePicker(label: String, selected: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Column {
@@ -62,6 +68,10 @@ fun SevilApp() {
     var courses by remember { mutableStateOf(listOf<JSONObject>()) }
     var sessions by remember { mutableStateOf(listOf<JSONObject>()) }
     var publicSources by remember { mutableStateOf(listOf<JSONObject>()) }
+    var provider by remember { mutableStateOf(api.prefs.getString("provider", "openai") ?: "openai") }
+    var audioProvider by remember { mutableStateOf(api.prefs.getString("audioProvider", "gemini") ?: "gemini") }
+    var providers by remember { mutableStateOf(listOf<JSONObject>()) }
+    fun generationOptions() = JSONObject().put("provider", provider).put("transcription_provider", if(provider == "claude") audioProvider else provider)
     var active by remember { mutableStateOf<JSONObject?>(null) }
     var mode by remember { mutableStateOf("demo") }
     var error by remember { mutableStateOf("") }
@@ -96,11 +106,14 @@ fun SevilApp() {
         courses = JSONArray(api.json("/v1/courses")).objects()
         sessions = JSONArray(api.json("/v1/sessions")).objects()
         mode = JSONObject(api.json("/health")).getString("mode")
+        val config = JSONObject(api.json("/v1/providers"))
+        providers = config.getJSONArray("providers").objects()
+        if(!api.prefs.contains("provider")) provider = config.getString("default_provider")
         if (courseId.isBlank() && courses.isNotEmpty()) courseId = courses.first().getString("id")
     }
     suspend fun open(id: String) {
         active = JSONObject(api.json("/v1/sessions/$id"))
-        publicSources = JSONObject(api.json("/v1/courses/${active!!.getString("course_id")}/sources")).getJSONArray("links").objects()
+        publicSources = JSONObject(api.json("/v1/courses/${active!!.getString("course_id")}/sources?provider=$provider")).getJSONArray("links").objects()
         transcript = active!!.optString("transcript")
         pending = pendingRecordings(context, id)
     }
@@ -136,6 +149,7 @@ fun SevilApp() {
         } else { active?.let { pending = pendingRecordings(context, it.getString("id")) } }
     }
     LaunchedEffect(recording.error) { recording.error?.let { error = it } }
+    LaunchedEffect(provider) { active?.let { session -> runCatching { publicSources = JSONObject(api.json("/v1/courses/${session.getString("course_id")}/sources?provider=$provider")).getJSONArray("links").objects() }.onFailure { error = it.message ?: t("error") } } }
     LaunchedEffect(active?.getString("id"), active?.optString("status")) {
         val id = active?.getString("id")
         if(active?.optString("status") == "processing" && id != null) while(true) { delay(2000); try { open(id); refresh() } catch(e: Exception) { error = e.message ?: t("error"); break } }
@@ -146,6 +160,14 @@ fun SevilApp() {
             if(mode == "demo") Surface(color = Color(0xFFF1EDDF), shape = MaterialTheme.shapes.medium) { Text(t("demoNotice"), Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall) }
             if(error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) { Text(error, Modifier.padding(14.dp)) }
             if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val choices = linkedMapOf("openai" to "OpenAI", "gemini" to "Gemini", "claude" to "Claude").mapValues { (id, label) -> label + " · " + t(if(providers.firstOrNull { it.getString("id") == id }?.optBoolean("configured") == true) "configured" else "notConfigured") }
+                CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    ProviderPicker(t("aiProvider"), provider, choices, enabled = !disabled && !isRecording) { provider = it; api.prefs.edit().putString("provider",it).apply() }
+                    if(provider == "claude") ProviderPicker(t("audioProvider"), audioProvider, linkedMapOf("gemini" to "Gemini", "openai" to "OpenAI"), enabled = !disabled && !isRecording) { audioProvider = it; api.prefs.edit().putString("audioProvider",it).apply() }
+                }
+                Text(t(if(provider == "claude") "claudeAudioNotice" else "providerNotice"), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            } }
             if(session == null) {
                 Text(t("welcome"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(t("subtitle"), color = Color.Gray)
@@ -156,7 +178,7 @@ fun SevilApp() {
                 OutlinedButton(enabled = !busy, onClick = { work {
                     val c = courses.firstOrNull { it.optString("code") == "DEMO" } ?: JSONObject(api.json("/v1/courses", "POST", JSONObject().put("title", "Learning across languages").put("university", "SeviL sample university").put("code", "DEMO")))
                     val s = JSONObject(api.json("/v1/sessions", "POST", JSONObject().put("course_id", c.getString("id")).put("title", "From listening to understanding").put("recording_permission", true)))
-                    if(mode == "demo") api.json("/v1/sessions/${s.getString("id")}/generate", "POST")
+                    if(mode == "demo") api.json("/v1/sessions/${s.getString("id")}/generate", "POST", generationOptions())
                     refresh(); open(s.getString("id"))
                 } }) { Text(t("demo")) }
                 Text(t("courses"), style = MaterialTheme.typography.titleLarge)
@@ -170,6 +192,7 @@ fun SevilApp() {
                 val id = session.getString("id")
                 Text(session.getString("title"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text(t(session.optString("status")), color = MaterialTheme.colorScheme.primary)
+                if(session.optJSONObject("handout") != null && session.optString("generated_mode") == "live") Text(t("generatedWith") + ": " + (mapOf("openai" to "OpenAI", "gemini" to "Gemini", "claude" to "Claude")[session.optString("generated_provider")] ?: session.optString("generated_provider")), style = MaterialTheme.typography.labelMedium)
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(clock(if(isRecording) elapsed else audioEnd), style = MaterialTheme.typography.headlineLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -179,7 +202,7 @@ fun SevilApp() {
                 } }
                 pending.forEach { (file, data) -> if(!isRecording) Card { Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { Text("${t("audio")} · ${clock(data.optLong("duration"))}"); TextButton(enabled = !disabled, onClick = { work { upload(file, "audio", file.name, data.getLong("offset"), data.optLong("duration")); file.delete(); File(file.path + ".json").delete(); pending = pendingRecordings(context, id) } }) { Text(t("retry")) } } } }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(enabled = !disabled && !isRecording && pending.isEmpty(), onClick = { work { api.json("/v1/sessions/$id/generate", "POST"); open(id) } }) { Text(t("generate")) }
+                    Button(enabled = !disabled && !isRecording && pending.isEmpty(), onClick = { work { api.json("/v1/sessions/$id/generate", "POST", generationOptions()); open(id) } }) { Text(t("generate")) }
                     OutlinedButton(enabled = session.optString("status") == "ready" && !busy, onClick = { pdfPicker.launch("sevil-handout.pdf") }) { Text(t("download")) }
                 }
                 session.optString("error").takeIf { it.isNotEmpty() && it != "null" }?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -209,7 +232,7 @@ fun SevilApp() {
                 Text(t("publicSources"), style = MaterialTheme.typography.titleMedium)
                 Text(t("sourceNotice"), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                 publicSources.forEach { source -> TextButton(onClick = { val url = Uri.parse(source.getString("url")); if(url.scheme == "https") context.startActivity(Intent(Intent.ACTION_VIEW, url)) }) { Text(source.getString("title")) } }
-                OutlinedButton(enabled = !disabled && !isRecording && mode != "demo", onClick = { work { val found = JSONObject(api.json("/v1/courses/${session.getString("course_id")}/discover", "POST")); publicSources = found.getJSONArray("links").objects() } }) { Text(t("discover")) }
+                OutlinedButton(enabled = !disabled && !isRecording && mode != "demo", onClick = { work { val found = JSONObject(api.json("/v1/courses/${session.getString("course_id")}/discover", "POST", JSONObject().put("provider",provider))); publicSources = found.getJSONArray("links").objects() } }) { Text(t("discover")) }
                 OutlinedButton(enabled = !disabled && !isRecording, onClick = { pendingKind = "audio"; filePicker.launch(arrayOf("audio/*")) }) { Text(t("uploadAudio")) }
                 if(!isRecording) { OutlinedTextField(photoOffset, { photoOffset = it.filter(Char::isDigit) }, label = { Text(t("photoOffset")) }); OutlinedButton(enabled = !disabled, onClick = { pendingKind = "photo"; filePicker.launch(arrayOf("image/jpeg", "image/png", "image/webp")) }) { Text(t("photo")) } }
                 TextButton(enabled = !disabled && !isRecording, onClick = { dialog = "delete" }) { Text(t("delete"), color = MaterialTheme.colorScheme.error) }

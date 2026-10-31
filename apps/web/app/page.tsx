@@ -35,6 +35,14 @@ import {
 
 type Locale = keyof typeof catalog;
 type Key = keyof typeof catalog.en;
+type Provider = "openai" | "gemini" | "claude";
+type ProviderInfo = {
+  id: Provider;
+  label: string;
+  configured: boolean;
+  audio_supported: boolean;
+  model: string;
+};
 const languages: Record<Locale, string> = {
   en: "English",
   tr: "Türkçe",
@@ -84,6 +92,15 @@ export default function Home() {
     [camera, setCamera] = useState(false),
     [pending, setPending] = useState<SavedClip[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
+  const [provider, setProvider] = useState<Provider>("openai");
+  const [audioProvider, setAudioProvider] = useState<"openai" | "gemini">(
+    "gemini",
+  );
+  const [providerInfo, setProviderInfo] = useState<ProviderInfo[]>([]);
+  const generationOptions = () => ({
+    provider,
+    transcription_provider: provider === "claude" ? audioProvider : provider,
+  });
   const [publicSources, setPublicSources] = useState<
     { url: string; title: string }[]
   >([]);
@@ -123,14 +140,20 @@ export default function Home() {
     }
   }
   async function refresh() {
-    const [c, s, h] = await Promise.all([
+    const [c, s, h, p] = await Promise.all([
       request<Course[]>("/v1/courses"),
       request<Session[]>("/v1/sessions"),
       request<{ mode: string; ai_configured: boolean }>("/health"),
+      request<{ default_provider: Provider; providers: ProviderInfo[] }>(
+        "/v1/providers",
+      ),
     ]);
     setCourses(c);
     setSessions(s);
     setHealth(h);
+    setProviderInfo(p.providers);
+    const savedProvider = localStorage.getItem("sevil-provider");
+    if (!savedProvider) setProvider(p.default_provider);
     if (!courseId && c.length) setCourseId(c[0].id);
   }
   async function openSession(id: string) {
@@ -139,7 +162,7 @@ export default function Home() {
     setText(s.transcript);
     setPending(await clips(id));
     const found = await request<{ links: { url: string; title: string }[] }>(
-      `/v1/courses/${s.course_id}/sources`,
+      `/v1/courses/${s.course_id}/sources?provider=${provider}`,
     );
     setPublicSources(found.links);
   }
@@ -147,6 +170,12 @@ export default function Home() {
     const saved = localStorage.getItem("sevil-locale");
     if (saved && saved in catalog) setLocale(saved as Locale);
     setToken(sessionStorage.getItem("sevil-token") || "");
+    const savedProvider = localStorage.getItem("sevil-provider");
+    if (savedProvider && ["openai", "gemini", "claude"].includes(savedProvider))
+      setProvider(savedProvider as Provider);
+    const savedAudio = localStorage.getItem("sevil-audio-provider");
+    if (savedAudio === "openai" || savedAudio === "gemini")
+      setAudioProvider(savedAudio);
   }, []);
   useEffect(() => {
     action(refresh); /* credentials change triggers fresh reads */
@@ -155,6 +184,14 @@ export default function Home() {
     document.documentElement.lang = locale;
     localStorage.setItem("sevil-locale", locale);
   }, [locale]);
+  useEffect(() => {
+    if (!active) return;
+    request<{ links: { url: string; title: string }[] }>(
+      `/v1/courses/${active.course_id}/sources?provider=${provider}`,
+    )
+      .then((r) => setPublicSources(r.links))
+      .catch((e) => setError(e.message));
+  }, [provider, active?.course_id]); // eslint-disable-line
   useEffect(() => {
     if (!active || active.status !== "processing") return;
     const timer = setInterval(() => {
@@ -391,7 +428,10 @@ export default function Home() {
     await refresh();
     await openSession(s.id);
     if (health?.mode === "demo") {
-      await request(`/v1/sessions/${s.id}/generate`, { method: "POST" });
+      await request(`/v1/sessions/${s.id}/generate`, {
+        method: "POST",
+        body: JSON.stringify(generationOptions()),
+      });
       await openSession(s.id);
     }
   }
@@ -563,6 +603,60 @@ export default function Home() {
               {t("demoNotice")}
             </div>
           )}
+          <section className="provider-bar" aria-label={t("aiProvider")}>
+            <label>
+              {t("aiProvider")}
+              <select
+                value={provider}
+                disabled={busy || recording || active?.status === "processing"}
+                onChange={(e) => {
+                  const p = e.target.value as Provider;
+                  setProvider(p);
+                  localStorage.setItem("sevil-provider", p);
+                }}
+              >
+                {(["openai", "gemini", "claude"] as Provider[]).map((p) => (
+                  <option key={p} value={p}>
+                    {
+                      { openai: "OpenAI", gemini: "Gemini", claude: "Claude" }[
+                        p
+                      ]
+                    }{" "}
+                    ·{" "}
+                    {t(
+                      providerInfo.find((info) => info.id === p)?.configured
+                        ? "configured"
+                        : "notConfigured",
+                    )}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {provider === "claude" && (
+              <label>
+                {t("audioProvider")}
+                <select
+                  value={audioProvider}
+                  disabled={
+                    busy || recording || active?.status === "processing"
+                  }
+                  onChange={(e) => {
+                    const p = e.target.value as "openai" | "gemini";
+                    setAudioProvider(p);
+                    localStorage.setItem("sevil-audio-provider", p);
+                  }}
+                >
+                  <option value="gemini">Gemini</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </label>
+            )}
+            <p>
+              {t(
+                provider === "claude" ? "claudeAudioNotice" : "providerNotice",
+              )}
+            </p>
+          </section>
           {!active ? (
             <>
               <div className="page-heading">
@@ -907,6 +1001,20 @@ export default function Home() {
                             SEVIL / {t("notes")}
                           </div>
                           <h2>{active.handout.title}</h2>
+                          {active.generated_mode === "live" &&
+                            active.generated_provider && (
+                              <p className="muted">
+                                {t("generatedWith")}:{" "}
+                                {(
+                                  {
+                                    openai: "OpenAI",
+                                    gemini: "Gemini",
+                                    claude: "Claude",
+                                  } as Record<string, string>
+                                )[active.generated_provider] ||
+                                  active.generated_provider}
+                              </p>
+                            )}
                           {active.generated_mode === "demo" && (
                             <span className="badge draft">DEMO</span>
                           )}
@@ -1059,6 +1167,7 @@ export default function Home() {
                         action(async () => {
                           await request(`/v1/sessions/${active.id}/generate`, {
                             method: "POST",
+                            body: JSON.stringify(generationOptions()),
                           });
                           await openSession(active.id);
                         })
@@ -1215,6 +1324,7 @@ export default function Home() {
                             links: { url: string; title: string }[];
                           }>(`/v1/courses/${active.course_id}/discover`, {
                             method: "POST",
+                            body: JSON.stringify({ provider }),
                           });
                           setPublicSources(found.links);
                         })

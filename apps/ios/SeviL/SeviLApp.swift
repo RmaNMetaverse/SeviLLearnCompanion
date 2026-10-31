@@ -20,6 +20,7 @@ struct RootView: View {
                     if model.mode == "demo" { Text(model.t("demoNotice")).font(.caption).padding(15).frame(maxWidth:.infinity,alignment:.leading).background(Color.yellow.opacity(0.09),in:RoundedRectangle(cornerRadius:12)) }
                     if !model.error.isEmpty { Text(model.error).foregroundStyle(.red).font(.callout).textSelection(.enabled) }
                     if model.busy { ProgressView().frame(maxWidth:.infinity) }
+                    ProviderControls().disabled(model.busy || recorder.recording || model.active?.status == "processing")
                     if model.active != nil { SessionView() } else { HomeView(sheet:$sheet) }
                 }.padding(22).frame(maxWidth:1000).frame(maxWidth:.infinity)
             }.background(Color(red:0.97,green:0.98,blue:0.96))
@@ -32,7 +33,24 @@ struct RootView: View {
                 if sheet == "settings" { SettingsView() } else if sheet == "course" { CourseForm() } else { SessionForm() }
             }
             .task { model.run { try await model.refresh() } }
+            .task(id:model.provider) { do { try await model.refreshSources() } catch { model.error = error.localizedDescription } }
         }
+    }
+}
+
+struct ProviderControls: View {
+    @EnvironmentObject var model: AppModel
+    func label(_ id: String) -> String {
+        let info = model.providers.first { $0.id == id }
+        let name = info?.label ?? (["openai":"OpenAI","gemini":"Gemini","claude":"Claude"][id] ?? id)
+        return name + " · " + model.t(info?.configured == true ? "configured" : "notConfigured")
+    }
+    var body: some View {
+        VStack(alignment:.leading,spacing:10) {
+            Picker(model.t("aiProvider"),selection:$model.provider) { ForEach(["openai","gemini","claude"],id:\.self) { id in Text(label(id)).tag(id) } }.pickerStyle(.menu)
+            if model.provider == "claude" { Picker(model.t("audioProvider"),selection:$model.audioProvider) { Text("Gemini").tag("gemini"); Text("OpenAI").tag("openai") }.pickerStyle(.menu) }
+            Text(model.t(model.provider == "claude" ? "claudeAudioNotice" : "providerNotice")).font(.caption).foregroundStyle(.secondary)
+        }.card()
     }
 }
 
@@ -83,6 +101,7 @@ struct SessionView: View {
         VStack(alignment:.leading,spacing:20) {
             Text(session.title).font(.largeTitle.bold())
             Text(model.t(session.status)).font(.caption).foregroundStyle(.secondary)
+            if session.handout != nil, session.generated_mode == "live", let provider = session.generated_provider { Text(model.t("generatedWith") + ": " + (["openai":"OpenAI","gemini":"Gemini","claude":"Claude"][provider] ?? provider)).font(.caption).foregroundStyle(.secondary) }
             recordingPanel
             if !recorder.error.isEmpty { Text(recorder.error).foregroundStyle(.red).font(.caption) }
             if !recorder.recording { ForEach(recorder.pending) { clip in HStack {

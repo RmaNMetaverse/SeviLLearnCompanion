@@ -42,4 +42,5 @@ export type Session = {
   assets?: Asset[];
   sources?: { id: string; label: string }[];
   generated_mode?: string;
+  generated_provider?: string;
 };

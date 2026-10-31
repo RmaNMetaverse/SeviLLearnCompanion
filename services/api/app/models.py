@@ -2,6 +2,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 LANGUAGES = {"en", "tr", "zh-Hans", "ja", "ko", "de", "fr", "es"}
+Provider = Literal["openai", "gemini", "claude"]
+
+class GenerationInput(BaseModel):
+    provider: Provider | None = None
+    transcription_provider: Literal["openai", "gemini"] | None = None
 
 class CourseInput(BaseModel):
     title: str = Field(min_length=1, max_length=160)

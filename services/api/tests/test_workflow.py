@@ -16,6 +16,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("SEVIL_AUTO_DISCOVERY", "false")
     monkeypatch.delenv("SEVIL_ACCESS_TOKEN", raising=False)
     monkeypatch.setenv("SEVIL_ENV", "development")
+    monkeypatch.setenv("SEVIL_DEFAULT_PROVIDER", "openai")
+    for key in ("OPENAI_API_KEY","GEMINI_API_KEY","ANTHROPIC_API_KEY"): monkeypatch.delenv(key,raising=False)
     with TestClient(app) as client: yield client
 
 def course(client, language="en"):
@@ -118,7 +120,8 @@ def test_live_rejects_fabricated_citations(client, monkeypatch):
     from app import processing
     note = processing.demo_handout(s).model_dump()
     note["sections"][0].update(kind="lecture",citations=["invented-source"])
-    monkeypatch.setattr(processing,"api_post",lambda *a,**kw:{"output":[{"content":[{"type":"output_text","text":json.dumps(note)}]}]})
+    monkeypatch.setenv("OPENAI_API_KEY","test-key")
+    monkeypatch.setattr(processing,"make_note",lambda *a,**kw:json.dumps(note))
     generate(s["id"])
     stored=store.get("session",s["id"])
     assert stored["status"] == "failed"

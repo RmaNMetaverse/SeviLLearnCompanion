@@ -16,6 +16,9 @@ Every product change must preserve equivalent user-visible behavior across Andro
 | Eight-language interface | Shared catalog | Shared catalog | Shared catalog |
 | Server token | Browser session | Private app preferences | Keychain |
 | Automatic GitHub prerelease downloads | Standalone server archive | Debug-signed APK | Simulator app + unsigned device IPA |
+| AI provider dropdown | OpenAI/Gemini/Claude | OpenAI/Gemini/Claude | OpenAI/Gemini/Claude |
+| Claude audio-service selection | Explicit Gemini/OpenAI choice | Explicit Gemini/OpenAI choice | Explicit Gemini/OpenAI choice |
+| Generated-note provider provenance | Displayed | Displayed | Displayed |
 
 ## Verification
 
@@ -24,7 +27,7 @@ Every product change must preserve equivalent user-visible behavior across Andro
 - Android: Windows debug APK build with the installed SDK. No physical device was connected during initial development; recording/camera runtime checks remain required.
 - iOS: the source compiled successfully with Xcode on GitHub's macOS runner in [run 41223414740](https://github.com/RmaNMetaverse/SeviLLearnCompanion/actions/runs/41223414740). Physical iPhone/iPad checks remain required. Windows itself did not run Xcode.
 - Web browser checks: generated sample handout, Turkish interface switch, phone-width layout without horizontal overflow, and a successful PDF download. Local screenshots are retained under ignored `artifacts/`.
-- Live OpenAI requests were not made: no API key was provided. API integration is implemented but real classroom accuracy, cost and latency remain unverified.
+- A live Gemini-only test passed with synthetic audio, a board image, a reading resource, structured notes and PDF export. The key remains in ignored local configuration. OpenAI and Claude calls have routing/format tests; live calls were not made for those providers in this change. Real classroom accuracy and long-session behavior remain unverified.
 - Docker deployment is configured but has not been run locally. Containers and public deployment need a separate environment check before use.
 
 ## Release rule

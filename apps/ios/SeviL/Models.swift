@@ -42,7 +42,10 @@ struct LectureSession: Codable, Identifiable {
     let assets: [Asset]?
     let sources: [Source]?
     let generated_mode: String?
+    let generated_provider: String?
 }
+struct AIProvider: Decodable, Identifiable { let id: String; let label: String; let configured: Bool; let audio_supported: Bool; let model: String }
+struct ProviderCatalog: Decodable { let default_provider: String; let providers: [AIProvider] }
 struct Health: Decodable { let mode: String; let ai_configured: Bool }
 struct PublicLink: Codable, Identifiable { let url: String; let title: String; var id: String { url } }
 struct Discovery: Decodable { let links: [PublicLink]; let summary: String }

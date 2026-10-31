@@ -68,7 +68,7 @@ Local server setup, API credentials, and deployment instructions: [README]({sour
 
 `SHA256SUMS.txt` and `build-manifest.json` identify the binaries and exact source commit. The standard GitHub source archives also contain the backend and deployment configuration. No classroom files, API keys, or signing credentials are included.
 
-The app remains a single-user pilot. Demo mode uses explicitly synthetic notes. Live AI needs a server-side OpenAI key. Camera, microphone, background operation and real-classroom accuracy still need physical-device validation.
+The app remains a single-user pilot. Demo mode uses explicitly synthetic notes. Live AI needs the selected provider key on the server (OpenAI, Gemini or Claude; Claude audio requires an explicit Gemini/OpenAI choice). Camera, microphone, background operation and real-classroom accuracy still need physical-device validation.
 """
     notes_path.write_text(notes, encoding="utf-8")
     (folder / "INSTALLATION.md").write_text(notes, encoding="utf-8")

@@ -13,7 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from PIL import Image, ImageOps, UnidentifiedImageError
 from . import store
-from .models import CourseInput, SessionInput, TranscriptInput, LANGUAGES
+from .models import CourseInput, SessionInput, TranscriptInput, GenerationInput, Provider, LANGUAGES
+from .providers import catalog, default_provider, require_key, configured
 from .processing import generate, assets_for
 from .pdf import render
 
@@ -64,7 +65,10 @@ def invalidate(session):
     store.save("session", session)
 
 @app.get("/health")
-def health(): return {"status": "ok", "version": "0.1.0", "mode": os.getenv("SEVIL_MODE", "demo"), "ai_configured": bool(os.getenv("OPENAI_API_KEY"))}
+def health(): return {"status": "ok", "version": "0.1.0", "mode": os.getenv("SEVIL_MODE", "demo"), "ai_configured": any(configured(p) for p in ("openai","gemini","claude"))}
+
+@app.get("/v1/providers", dependencies=[Depends(access)])
+def providers(): return catalog()
 
 @app.get("/v1/courses", dependencies=[Depends(access)])
 def courses(): return store.all_records("course")
@@ -79,17 +83,18 @@ def create_course(body: CourseInput):
 def sessions(): return store.all_records("session")
 
 @app.get("/v1/courses/{id}/sources", dependencies=[Depends(access)])
-def discovered_sources(id: str):
+def discovered_sources(id: str, provider: Provider | None = None):
     require("course", id)
-    return store.get("discovery", id) or {"id":id,"course_id":id,"summary":"","links":[]}
+    return store.get("discovery", id + ":" + (provider or default_provider())) or {"id":id,"course_id":id,"summary":"","links":[]}
 
 @app.post("/v1/courses/{id}/discover", dependencies=[Depends(access)])
-async def discover_sources(id: str):
+async def discover_sources(id: str, body: GenerationInput = GenerationInput()):
     from .discovery import discover
     course = require("course", id)
-    try: await asyncio.to_thread(discover, course)
+    provider = body.provider or default_provider()
+    try: await asyncio.to_thread(discover, course, provider)
     except ValueError as exc: raise HTTPException(502, str(exc))
-    return store.get("discovery", id) or {"id":id,"course_id":id,"summary":"","links":[]}
+    return store.get("discovery", id + ":" + provider) or {"id":id,"course_id":id,"summary":"","links":[]}
 
 @app.post("/v1/sessions", dependencies=[Depends(access)], status_code=201)
 def create_session(body: SessionInput):
@@ -106,7 +111,7 @@ def get_session(id: str):
 def transcript(id: str, body: TranscriptInput):
     session = require("session", id)
     editable(session)
-    session.update(transcript=body.text, transcript_sources=[{"id": "transcript:manual", "label": "Student-edited transcript; audio timing not verified"}])
+    session.update(transcript=body.text, transcript_provider="manual", transcript_sources=[{"id": "transcript:manual", "label": "Student-edited transcript; audio timing not verified"}])
     invalidate(session)
     return session
 
@@ -175,14 +180,23 @@ def download_asset(id: str):
     return FileResponse(store.DATA / "files" / id, media_type=asset["mime"], filename=asset["name"])
 
 @app.post("/v1/sessions/{id}/generate", dependencies=[Depends(access)], status_code=202)
-async def process(id: str):
+async def process(id: str, body: GenerationInput = GenerationInput()):
     session = require("session", id)
     editable(session)
+    provider = body.provider or default_provider()
+    if os.getenv("SEVIL_MODE", "demo") != "demo":
+        try:
+            require_key(provider)
+            if not session.get("transcript"):
+                audio_provider = body.transcription_provider or (provider if provider != "claude" else None)
+                if not audio_provider: raise ValueError("Choose Gemini or OpenAI as the audio service for Claude, or save a transcript first.")
+                require_key(audio_provider)
+        except ValueError as exc: raise HTTPException(422, str(exc))
     locks.add(id)
-    session.update(status="processing", error=None, handout=None)
+    session.update(status="processing", error=None, handout=None, requested_provider=provider, requested_transcription_provider=body.transcription_provider)
     store.save("session", session)
     async def work():
-        try: await asyncio.to_thread(generate, id)
+        try: await asyncio.to_thread(generate, id, provider, body.transcription_provider)
         finally: locks.discard(id)
     task = asyncio.create_task(work())
     tasks.add(task)

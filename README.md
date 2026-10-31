@@ -19,25 +19,28 @@ Open **http://localhost:3000**. API documentation: http://localhost:8000/docs. `
 
 The application starts in **demo mode**. “Try a sample lecture” generates explicitly labeled synthetic content; it does **not** analyze recordings, photos, or attachments. You can exercise course/session creation, uploads, transcript editing, notes, and PDF download without a key. The sample handout is in English regardless of interface language.
 
-The initial implementation passed web, backend, Android and iOS build checks on GitHub. The Android APK was also built locally on Windows. This verifies builds, not microphone/camera behavior on physical devices. Live provider calls await your API key.
+The initial implementation passed web, backend, Android and iOS build checks on GitHub. The Android APK was also built locally on Windows. This verifies builds, not microphone/camera behavior on physical devices. Gemini-only audio, board-image, notes and PDF processing has passed a live synthetic test; real-device classroom validation remains required.
 
 ## Enable real AI processing
+
+All three clients include an **AI service** dropdown: OpenAI, Gemini or Claude. Gemini supports audio transcription and multimodal notes; PDF generation runs locally. Claude uses an explicitly selected Gemini/OpenAI audio service or a saved transcript. See [provider configuration](docs/AI_PROVIDERS.md).
 
 Copy `.env.example` to `.env` if it does not exist. Edit it locally, never commit it:
 
 ```dotenv
 SEVIL_MODE=live
-OPENAI_API_KEY=your-private-key
-OPENAI_TRANSCRIPTION_MODEL=gpt-transcribe
-OPENAI_NOTES_MODEL=gpt-4.1
+SEVIL_DEFAULT_PROVIDER=gemini
+GEMINI_API_KEY=your-private-key
+GEMINI_MODEL=gemini-3.5-flash-lite
+GEMINI_TRANSCRIPTION_MODEL=gemini-3.5-flash-lite
 SEVIL_AUTO_DISCOVERY=true
 ```
 
-Restart the API after changing `.env`. Model names are configurable because provider capabilities and account access vary. The implementation uses the OpenAI HTTP API directly and keeps keys on the server. No real AI calls or paid resource searches are made in demo mode. API calls in live mode incur provider charges.
+Restart the API after changing `.env`. Model names are configurable because provider capabilities and account access vary. Provider keys stay on the server. The app never silently switches providers. No real AI calls or paid resource searches are made in demo mode. Live calls consume provider quota and may incur charges according to your account plan.
 
 Workflow: add a course → create a session and confirm recording permission → record/upload audio → capture board photos and attach course PDFs/text → generate → review evidence and uncertain passages → export PDF. A supplied transcript can be edited and saved before generation; this skips audio transcription and is labeled as student-edited evidence.
 
-In live mode, public-source discovery searches the named course, university and professor using OpenAI web search. Only returned HTTPS citation URLs are retained. It supplements course uploads with a **search summary**, not a verified copy of a syllabus or textbook. Open and verify the original links. The server never fetches arbitrary supplied URLs or bypasses restricted portals. Scanned PDFs need OCR before upload in this version.
+In live mode, public-source discovery searches the named course, university and professor using the selected provider's web search. Only returned HTTPS citation URLs are retained. It supplements course uploads with a **search summary**, not a verified copy of a syllabus or textbook. Open and verify the original links. The server never fetches arbitrary supplied URLs or bypasses restricted portals. Scanned PDFs need OCR before upload in this version.
 
 ## Native Android
 
@@ -76,7 +79,7 @@ Select your signing team and an iPhone/iPad, then build. `project.yml` is the so
 - Reusable course profiles: university, program, professor, course code, lecture language and note language.
 - Shared persistent sessions, consent acknowledgment, original files, editable transcripts, sources and notes.
 - Audio recording, independent board capture, manual uploads, capture timestamps, and pending-audio recovery in all clients.
-- Live OpenAI transcription, contextual terminology hints, public-source search, image input, structured notes and citation validation.
+- Selectable OpenAI/Gemini/Claude notes, OpenAI/Gemini transcription, contextual terminology hints, public-source search, image input, structured notes and citation validation.
 - Bilingual glossary, learning objectives, review questions, uncertainty list and PDF handouts with original board images.
 - English, Turkish, Simplified Chinese, Japanese, Korean, German, French, Spanish interfaces from one catalog.
 - Local development scripts, deployment containers and CI checks for web, server, Android and iOS.

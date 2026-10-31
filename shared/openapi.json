@@ -88,6 +88,43 @@
         "title": "CourseInput",
         "type": "object"
       },
+      "GenerationInput": {
+        "properties": {
+          "provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "openai",
+                  "gemini",
+                  "claude"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "transcription_provider": {
+            "anyOf": [
+              {
+                "enum": [
+                  "openai",
+                  "gemini"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription Provider"
+          }
+        },
+        "title": "GenerationInput",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -336,6 +373,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationInput",
+                "default": {}
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -371,6 +418,27 @@
               "title": "Id",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "provider",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "openai",
+                    "gemini",
+                    "claude"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
           }
         ],
         "responses": {
@@ -394,6 +462,22 @@
           }
         },
         "summary": "Discovered Sources"
+      }
+    },
+    "/v1/providers": {
+      "get": {
+        "operationId": "providers_v1_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Providers"
       }
     },
     "/v1/sessions": {
@@ -574,6 +658,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerationInput",
+                "default": {}
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": {
