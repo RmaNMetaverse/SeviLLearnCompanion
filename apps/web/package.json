@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build",
-    "start": "next start --hostname 127.0.0.1",
+    "build": "next build && node scripts/offline.cjs",
+    "start": "node scripts/serve.cjs",
+    "test": "node --import tsx --test tests/*.test.ts",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
@@ -19,7 +20,9 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "fake-indexeddb": "^6.2.7",
     "prettier": "3.6.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.0"
   }
 }

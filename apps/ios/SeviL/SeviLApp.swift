@@ -18,6 +18,7 @@ struct RootView: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:20) {
                     if model.mode == "demo" { Text(model.t("demoNotice")).font(.caption).padding(15).frame(maxWidth:.infinity,alignment:.leading).background(Color.yellow.opacity(0.09),in:RoundedRectangle(cornerRadius:12)) }
+                    Text(model.t("deviceStorageNotice")).font(.caption).foregroundStyle(.secondary)
                     if !model.error.isEmpty { Text(model.error).foregroundStyle(.red).font(.callout).textSelection(.enabled) }
                     if model.busy { ProgressView().frame(maxWidth:.infinity) }
                     ProviderControls().disabled(model.busy || recorder.recording || model.active?.status == "processing")

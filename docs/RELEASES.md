@@ -1,37 +1,28 @@
-# Automatic development releases
+# Development releases
 
-Every push to `main` builds its pushed HEAD revision on GitHub Actions. API checks and web, Android and iOS builds must all succeed before publication. Each successful push receives a separate prerelease named `build-<workflow run number>-<short commit SHA>`. Older pushed revisions finish even if a newer push arrives. A single push containing multiple commits builds its final revision; commits not pushed do not trigger GitHub Actions. Pull requests build and test but never publish releases. The workflow can also be run manually against `main`.
+Every successful push to `main` creates a separate GitHub prerelease after API/contract checks, browser tests/build, Android build/emulator tests and iOS simulator tests/device build pass. Pull requests build/test without publishing.
 
-Downloads: https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases
+- `SeviL-Android-debug.apk`: installable Android 8+ test app, debug-signed.
+- `SeviL-iOS-simulator.zip`: compiled app for a compatible Mac's iOS 17+ simulator.
+- `SeviL-iOS-unsigned.ipa`: compiled physical-device app; cannot be installed directly on an iPhone without Apple signing/provisioning.
+- `SeviL-web-server.tar.gz`: static app and small Node.js 24 file server. Extract and run `node start-local.cjs`; open localhost:3000. No Python API is needed.
+- `INSTALLATION.md`, `build-manifest.json`, `SHA256SUMS.txt`: installation steps, source commit and checksums.
 
-| Asset | Use |
-|---|---|
-| `SeviL-Android-debug.apk` | Installable Android test build; debug signed, not a Play Store package. |
-| `SeviL-iOS-simulator.zip` | Compiled simulator `.app` for a compatible Mac with Xcode. |
-| `SeviL-iOS-unsigned.ipa` | Compiled device app; must be signed and provisioned before installation on an iPhone/iPad. |
-| `SeviL-web-server.tar.gz` | Compiled Next.js standalone web server, including static assets. Requires Node.js 24 and the separate API. |
-| `INSTALLATION.md` | Platform-specific setup and signing limitations. |
-| `build-manifest.json` | Exact source revision, build run, sizes and SHA-256 hashes. |
-| `SHA256SUMS.txt` | Download integrity checks. |
+Each client has a separate device library and directly contacts its selected AI provider. Enter your key in its Settings. No secrets, classroom files or laptop data are included. iOS signing, TestFlight and store uploads are not configured.
 
-GitHub also provides the source archives for each release, including the backend, scripts and Docker deployment configuration. Applications still need a running API server; publishing binary downloads does not deploy the backend or web site.
+## Stable Android test updates
 
-The web package includes `start-local.cjs`. Run `node start-local.cjs` to bind it only to this computer; use the separate Docker deployment instructions for remote hosting.
+Store a Base64-encoded debug keystore as the repository Actions secret `ANDROID_DEBUG_KEYSTORE_BASE64` to keep the test signing certificate stable. The workflow restores it to the runner's default debug keystore location. Use the standard debug keystore credentials (`android`, alias `androiddebugkey`) for development only. Never commit the keystore or use it for production distribution.
 
-## iOS signing
+Without the secret, GitHub runners generate different test certificates. Android then rejects an update over the previous build; uninstalling deletes that installation's local library. Export important files first. The local laptop's debug keystore is separate unless the same keystore is configured for GitHub. The build manifest identifies source and build number, not signing continuity.
 
-GitHub's macOS runners can compile iOS applications without your owning a Mac. They cannot create your Apple developer identity or provisioning permission. The unsigned IPA is deliberately labeled, and the simulator bundle cannot run on a physical iPhone.
+## iOS simulator
 
-To add an installable device IPA later, configure an Apple Developer team, an app identifier, a signing certificate/private key, a provisioning profile and the intended distribution method (registered devices, TestFlight or App Store). Signing material must be held in GitHub Actions secrets, never Git. This workflow currently performs no Apple signing, TestFlight upload or App Store submission.
+Unzip the simulator download on a Mac, boot a compatible simulator and run:
 
-## Android updates and signing
+```bash
+xcrun simctl install booted /absolute/path/to/SeviL.app
+xcrun simctl launch booted com.sevil.learncompanion
+```
 
-The workflow uses Android debug signing. Without a persistent key, a runner may produce a different signing identity on another run, preventing an in-place update. Uninstalling loses app-local data, including pending recordings; export/upload those first.
-
-For stable **test** signatures, set the optional repository secret `ANDROID_DEBUG_KEYSTORE_BASE64` to the base64 contents of a standard Android debug keystore (alias `androiddebugkey`, store/key password `android`). This can be the development laptop's existing debug keystore. The workflow restores it privately before the build. Do not put a production signing key in this secret; Play Store release signing needs a separate release configuration.
-
-Do not paste the keystore contents into chat, commit it, or include it in a release. If no secret is present, builds still succeed with a runner-generated debug key. CI build numbers increment Android `versionCode` and iOS `CFBundleVersion`; local builds default to 1.
-
-## Publication behavior
-
-Only the publication job has repository write permission. It receives binaries from the same successful workflow run, verifies all required files exist and are nonempty, creates an exact-commit draft release, uploads binaries/metadata/checksums, then publishes it as a prerelease. Retrying the same run reuses the same tag and replaces its assets. Failed builds do not create a published release. Prereleases are not marked as the latest stable release; use the Releases page rather than GitHub's `/releases/latest` endpoint.
+For an iPhone/iPad, build the source with your own signing team or sign/provision the unsigned IPA with your Apple tools. No Mac or Apple credentials are needed merely to download the source and unsigned builds.

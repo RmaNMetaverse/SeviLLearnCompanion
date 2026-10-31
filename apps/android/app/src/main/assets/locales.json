@@ -20,7 +20,7 @@
     "resources": "Course materials",
     "uploadAudio": "Upload audio",
     "generate": "Generate handout",
-    "download": "Download PDF",
+    "download": "Export PDF",
     "transcript": "Transcript",
     "settings": "Settings",
     "server": "Server URL",
@@ -72,11 +72,14 @@
     "sourceNotice": "Search summaries supplement your uploaded materials. Verify the linked originals.",
     "aiProvider": "AI service",
     "audioProvider": "Audio service",
-    "providerNotice": "Keys stay on the server. The app never switches services automatically.",
+    "providerNotice": "Provider keys stay on this device. The app never switches services automatically.",
     "claudeAudioNotice": "Claude uses the selected audio service for transcription, or your saved transcript.",
     "configured": "Configured",
     "notConfigured": "Not configured",
-    "generatedWith": "Generated with"
+    "generatedWith": "Generated with",
+    "apiKey": "API key",
+    "deviceStorageNotice": "Your library and files are saved on this device. Internet is needed only for AI.",
+    "browserKeyNotice": "Browser keys stay in this tab only and clear when it reloads or closes."
   },
   "tr": {
     "workspace": "Çalışma alanı",
@@ -99,7 +102,7 @@
     "resources": "Ders materyalleri",
     "uploadAudio": "Ses yükle",
     "generate": "Ders notu oluştur",
-    "download": "PDF indir",
+    "download": "PDF dışa aktar",
     "transcript": "Döküm",
     "settings": "Ayarlar",
     "server": "Sunucu adresi",
@@ -151,11 +154,14 @@
     "sourceNotice": "Arama özetleri yüklediğiniz materyalleri destekler. Bağlantılı asılları doğrulayın.",
     "aiProvider": "Yapay zekâ hizmeti",
     "audioProvider": "Ses hizmeti",
-    "providerNotice": "Anahtarlar sunucuda kalır. Uygulama hizmeti kendiliğinden değiştirmez.",
+    "providerNotice": "Hizmet anahtarları bu cihazda kalır. Uygulama hizmetleri kendiliğinden değiştirmez.",
     "claudeAudioNotice": "Claude, döküm için seçilen ses hizmetini veya kaydedilmiş dökümünüzü kullanır.",
     "configured": "Yapılandırıldı",
     "notConfigured": "Yapılandırılmadı",
-    "generatedWith": "Oluşturan hizmet"
+    "generatedWith": "Oluşturan hizmet",
+    "apiKey": "API anahtarı",
+    "deviceStorageNotice": "Kitaplığınız ve dosyalarınız bu cihazda saklanır. İnternet yalnızca yapay zekâ için gerekir.",
+    "browserKeyNotice": "Tarayıcı anahtarları yalnızca bu sekmede tutulur; sekme yenilendiğinde veya kapandığında silinir."
   },
   "zh-Hans": {
     "workspace": "学习空间",
@@ -178,7 +184,7 @@
     "resources": "课程资料",
     "uploadAudio": "上传录音",
     "generate": "生成讲义",
-    "download": "下载 PDF",
+    "download": "导出 PDF",
     "transcript": "文字记录",
     "settings": "设置",
     "server": "服务器地址",
@@ -230,11 +236,14 @@
     "sourceNotice": "搜索摘要补充您上传的资料，请核实链接原文。",
     "aiProvider": "AI 服务",
     "audioProvider": "音频服务",
-    "providerNotice": "密钥仅保存在服务器上，应用不会自动切换服务。",
+    "providerNotice": "服务密钥保存在此设备上，应用不会自动切换服务。",
     "claudeAudioNotice": "Claude 使用所选音频服务转录，或使用您保存的文字记录。",
     "configured": "已配置",
     "notConfigured": "未配置",
-    "generatedWith": "生成服务"
+    "generatedWith": "生成服务",
+    "apiKey": "API 密钥",
+    "deviceStorageNotice": "学习库和文件保存在此设备上，仅 AI 处理需要联网。",
+    "browserKeyNotice": "浏览器密钥仅保存在当前标签页，刷新或关闭后清除。"
   },
   "ja": {
     "workspace": "学習スペース",
@@ -257,7 +266,7 @@
     "resources": "教材",
     "uploadAudio": "音声をアップロード",
     "generate": "講義ノートを生成",
-    "download": "PDFをダウンロード",
+    "download": "PDFを書き出す",
     "transcript": "文字起こし",
     "settings": "設定",
     "server": "サーバーURL",
@@ -309,11 +318,14 @@
     "sourceNotice": "検索要約は添付資料を補足します。リンク先の原文を確認してください。",
     "aiProvider": "AIサービス",
     "audioProvider": "音声サービス",
-    "providerNotice": "キーはサーバーに保存されます。サービスは自動で切り替わりません。",
+    "providerNotice": "キーはこの端末に保存されます。サービスは自動で切り替わりません。",
     "claudeAudioNotice": "Claudeは選択した音声サービスで文字起こしするか、保存済みの文字起こしを使用します。",
     "configured": "設定済み",
     "notConfigured": "未設定",
-    "generatedWith": "生成サービス"
+    "generatedWith": "生成サービス",
+    "apiKey": "APIキー",
+    "deviceStorageNotice": "ライブラリとファイルはこの端末に保存されます。AI処理のみインターネットが必要です。",
+    "browserKeyNotice": "ブラウザーのキーはこのタブ内だけで保持され、再読み込みや終了で消去されます。"
   },
   "ko": {
     "workspace": "학습 공간",
@@ -336,7 +348,7 @@
     "resources": "강의 자료",
     "uploadAudio": "음성 업로드",
     "generate": "강의 노트 생성",
-    "download": "PDF 다운로드",
+    "download": "PDF 내보내기",
     "transcript": "녹취록",
     "settings": "설정",
     "server": "서버 주소",
@@ -388,11 +400,14 @@
     "sourceNotice": "검색 요약은 첨부 자료를 보완합니다. 링크된 원문을 확인하세요.",
     "aiProvider": "AI 서비스",
     "audioProvider": "음성 서비스",
-    "providerNotice": "키는 서버에만 저장됩니다. 서비스는 자동으로 바뀌지 않습니다.",
+    "providerNotice": "서비스 키는 이 기기에 저장됩니다. 서비스는 자동으로 바뀌지 않습니다.",
     "claudeAudioNotice": "Claude는 선택한 음성 서비스로 녹취하거나 저장된 녹취록을 사용합니다.",
     "configured": "설정됨",
     "notConfigured": "설정되지 않음",
-    "generatedWith": "생성 서비스"
+    "generatedWith": "생성 서비스",
+    "apiKey": "API 키",
+    "deviceStorageNotice": "자료와 파일은 이 기기에 저장됩니다. AI 처리에만 인터넷이 필요합니다.",
+    "browserKeyNotice": "브라우저 키는 현재 탭에만 보관되며 새로고침하거나 닫으면 지워집니다."
   },
   "de": {
     "workspace": "Arbeitsbereich",
@@ -415,7 +430,7 @@
     "resources": "Kursmaterialien",
     "uploadAudio": "Audio hochladen",
     "generate": "Skript erstellen",
-    "download": "PDF herunterladen",
+    "download": "PDF exportieren",
     "transcript": "Transkript",
     "settings": "Einstellungen",
     "server": "Serveradresse",
@@ -467,11 +482,14 @@
     "sourceNotice": "Suchzusammenfassungen ergänzen Ihre Materialien. Prüfen Sie die verlinkten Originale.",
     "aiProvider": "KI-Dienst",
     "audioProvider": "Audiodienst",
-    "providerNotice": "Schlüssel bleiben auf dem Server. Der Dienst wird nie automatisch gewechselt.",
+    "providerNotice": "Schlüssel bleiben auf diesem Gerät. Der Dienst wird nie automatisch gewechselt.",
     "claudeAudioNotice": "Claude nutzt den gewählten Audiodienst zur Transkription oder Ihr gespeichertes Transkript.",
     "configured": "Eingerichtet",
     "notConfigured": "Nicht eingerichtet",
-    "generatedWith": "Erstellt mit"
+    "generatedWith": "Erstellt mit",
+    "apiKey": "API-Schlüssel",
+    "deviceStorageNotice": "Bibliothek und Dateien bleiben auf diesem Gerät. Nur KI benötigt Internet.",
+    "browserKeyNotice": "Browser-Schlüssel bleiben nur in diesem Tab und werden beim Neuladen oder Schließen gelöscht."
   },
   "fr": {
     "workspace": "Espace de travail",
@@ -494,7 +512,7 @@
     "resources": "Supports de cours",
     "uploadAudio": "Importer un audio",
     "generate": "Générer les notes",
-    "download": "Télécharger le PDF",
+    "download": "Exporter en PDF",
     "transcript": "Transcription",
     "settings": "Paramètres",
     "server": "Adresse du serveur",
@@ -546,11 +564,14 @@
     "sourceNotice": "Les résumés complètent vos documents. Vérifiez les sources originales.",
     "aiProvider": "Service IA",
     "audioProvider": "Service audio",
-    "providerNotice": "Les clés restent sur le serveur. Aucun changement automatique de service.",
+    "providerNotice": "Les clés restent sur cet appareil. Aucun changement automatique de service.",
     "claudeAudioNotice": "Claude utilise le service audio choisi pour la transcription ou votre transcription enregistrée.",
     "configured": "Configuré",
     "notConfigured": "Non configuré",
-    "generatedWith": "Généré avec"
+    "generatedWith": "Généré avec",
+    "apiKey": "Clé API",
+    "deviceStorageNotice": "La bibliothèque et les fichiers restent sur cet appareil. Seule l’IA nécessite Internet.",
+    "browserKeyNotice": "Les clés du navigateur restent dans cet onglet et sont effacées à son rechargement ou sa fermeture."
   },
   "es": {
     "workspace": "Espacio de estudio",
@@ -573,7 +594,7 @@
     "resources": "Materiales de clase",
     "uploadAudio": "Subir audio",
     "generate": "Generar apuntes",
-    "download": "Descargar PDF",
+    "download": "Exportar PDF",
     "transcript": "Transcripción",
     "settings": "Ajustes",
     "server": "Dirección del servidor",
@@ -625,10 +646,13 @@
     "sourceNotice": "Los resúmenes complementan tus materiales. Verifica las fuentes originales.",
     "aiProvider": "Servicio de IA",
     "audioProvider": "Servicio de audio",
-    "providerNotice": "Las claves permanecen en el servidor. El servicio nunca cambia automáticamente.",
+    "providerNotice": "Las claves permanecen en este dispositivo. El servicio nunca cambia automáticamente.",
     "claudeAudioNotice": "Claude usa el servicio de audio elegido para transcribir o tu transcripción guardada.",
     "configured": "Configurado",
     "notConfigured": "Sin configurar",
-    "generatedWith": "Generado con"
+    "generatedWith": "Generado con",
+    "apiKey": "Clave API",
+    "deviceStorageNotice": "La biblioteca y los archivos se guardan en este dispositivo. Solo la IA necesita internet.",
+    "browserKeyNotice": "Las claves del navegador solo permanecen en esta pestaña y se borran al recargarla o cerrarla."
   }
 }

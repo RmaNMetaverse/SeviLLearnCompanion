@@ -49,17 +49,20 @@ struct SessionForm: View {
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
-    @State private var server = UserDefaults.standard.string(forKey:"server") ?? "http://localhost:8000"
-    @State private var token = Keychain.read()
+    @State private var geminiKey = Keychain.read("gemini")
+    @State private var openaiKey = Keychain.read("openai")
+    @State private var claudeKey = Keychain.read("claude")
     var body: some View {
         NavigationStack { Form {
             LanguagePicker(label:model.t("language"),selection:$model.locale)
-            TextField(model.t("server"),text:$server).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
-            SecureField(model.t("token"),text:$token)
+            Text(model.t("deviceStorageNotice")).font(.caption)
+            SecureField("Gemini " + model.t("apiKey"),text:$geminiKey).textInputAutocapitalization(.never).autocorrectionDisabled()
+            SecureField("OpenAI " + model.t("apiKey"),text:$openaiKey).textInputAutocapitalization(.never).autocorrectionDisabled()
+            SecureField("Claude " + model.t("apiKey"),text:$claudeKey).textInputAutocapitalization(.never).autocorrectionDisabled()
             if !model.error.isEmpty { Text(model.error).foregroundStyle(.red) }
         }.navigationTitle(model.t("settings")).toolbar {
             ToolbarItem(placement:.cancellationAction) { Button(model.t("cancel")) { dismiss() } }
-            ToolbarItem(placement:.confirmationAction) { Button(model.t("save")) { UserDefaults.standard.set(server,forKey:"server"); Keychain.save(token); model.run { try await model.refresh(); dismiss() } } }
+            ToolbarItem(placement:.confirmationAction) { Button(model.t("save")) { Keychain.save(geminiKey,account:"gemini"); Keychain.save(openaiKey,account:"openai"); Keychain.save(claudeKey,account:"claude"); model.run { try await model.refresh(); dismiss() } } }
         } }
     }
 }

@@ -1,69 +1,61 @@
 # SeviL Learn Companion
 
-A multilingual lecture companion for international students. Native **Kotlin/Compose Android**, native **Swift/SwiftUI iOS**, and **Next.js web** clients share one Python API and eight interface languages.
+A lecture companion for international students with native Kotlin/Compose Android, native Swift/SwiftUI iOS and a static Next.js web application. All three clients keep **separate libraries on their own device**. No laptop backend, hosted account or cloud database is required. Cloud sync is planned later.
 
-## Download builds
+## Downloads
 
-Every successful push to `main` automatically publishes a [GitHub development release](https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases) after all platform checks pass. Downloads include an installable Android debug APK, an iOS simulator app, an **unsigned** iOS device IPA, and a compiled web server. The device IPA needs Apple signing/provisioning before it can be installed on an iPhone. See [release and installation details](docs/RELEASES.md).
+Successful pushes to `main` publish [development releases](https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases) after web tests, Android emulator tests, iOS simulator tests and all builds pass. Downloads include an Android debug APK, an iOS simulator app, an **unsigned** iOS device IPA, and a runnable static web package. An unsigned IPA needs Apple signing/provisioning before installation. These are development builds, not app-store releases.
 
-## Run on Windows
+## Use Gemini on a phone
 
-Requirements: Python 3.12+, Node.js 22+, Git. The initial setup has already been performed on the development laptop.
+Install the new APK, open **Settings**, paste your own Gemini API key into the Gemini field, and save. Select **Gemini** in the AI service dropdown. Courses, sessions, recording, photos and existing PDF exports work without a key or internet. Generating new AI notes and searching for public sources require internet and provider quota. No server URL or `adb reverse` is needed.
+
+Keys are entered separately on each device. Android encrypts saved keys using Android Keystore; iOS uses Keychain. Browser keys stay in the current tab's memory and clear on reload or close. A key in the laptop's ignored `.env` does not configure a phone. No shared secret is embedded in public binaries or source code.
+
+## Where data lives
+
+| Client | Database | Original recordings and attachments | AI connection |
+|---|---|---|---|
+| Android | Private SQLite `sevil-device.sqlite3` | Private app files | Direct to selected provider over HTTPS |
+| iOS/iPadOS | Private SQLite `SeviLLibrary/library.sqlite3` | Private Application Support files | Direct to selected provider over HTTPS |
+| Web | Browser IndexedDB `sevil-device-library` | IndexedDB blobs; recording checkpoints in a separate recovery database | Direct to selected provider over HTTPS |
+
+There is no sync or account yet. Device libraries survive ordinary restarts and compatible app updates, but uninstalling, clearing app/site storage or browser eviction can delete them. Export important handouts and keep original source files. A complete library backup/import feature is not implemented. Old laptop-backed libraries remain in `data/`; they are not automatically migrated into device libraries.
+
+The earlier pilot used FastAPI, SQLite `data/sevil.sqlite3`, and media in `data/files` on the laptop. That service is retained under `services/api` for development and future cloud work. Current clients do not connect to it.
+
+## Run the web app on Windows
+
+With Node.js 24 and installed dependencies:
 
 ```powershell
-.\scripts\setup.ps1
+npm.cmd ci --prefix apps/web
 .\scripts\start-local.ps1
 ```
 
-Open **http://localhost:3000**. API documentation: http://localhost:8000/docs. `Start-SeviL.cmd` also starts the app. Stop with `scripts\stop-local.ps1`. Background processes use hidden windows; logs are under `.tools/run`.
+Open http://localhost:3000. Stop with `.\scripts\stop-local.ps1`. `Start-SeviL.cmd` also starts it. Development startup runs only the web app. Logs are in `.tools/run`.
 
-The application starts in **demo mode**. “Try a sample lecture” generates explicitly labeled synthetic content; it does **not** analyze recordings, photos, or attachments. You can exercise course/session creation, uploads, transcript editing, notes, and PDF download without a key. The sample handout is in English regardless of interface language.
+For an offline-capable production build:
 
-The initial implementation passed web, backend, Android and iOS build checks on GitHub. The Android APK was also built locally on Windows. This verifies builds, not microphone/camera behavior on physical devices. Gemini-only audio, board-image, notes and PDF processing has passed a live synthetic test; real-device classroom validation remains required.
-
-## Enable real AI processing
-
-All three clients include an **AI service** dropdown: OpenAI, Gemini or Claude. Gemini supports audio transcription and multimodal notes; PDF generation runs locally. Claude uses an explicitly selected Gemini/OpenAI audio service or a saved transcript. See [provider configuration](docs/AI_PROVIDERS.md).
-
-Copy `.env.example` to `.env` if it does not exist. Edit it locally, never commit it:
-
-```dotenv
-SEVIL_MODE=live
-SEVIL_DEFAULT_PROVIDER=gemini
-GEMINI_API_KEY=your-private-key
-GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_TRANSCRIPTION_MODEL=gemini-3.5-flash-lite
-SEVIL_AUTO_DISCOVERY=true
+```powershell
+npm.cmd run build --prefix apps/web
+npm.cmd start --prefix apps/web
 ```
 
-Restart the API after changing `.env`. Model names are configurable because provider capabilities and account access vary. Provider keys stay on the server. The app never silently switches providers. No real AI calls or paid resource searches are made in demo mode. Live calls consume provider quota and may incur charges according to your account plan.
+The production build caches app assets after the first successful load. AI always requires internet. Keep the tab open during recording and AI processing. Browser camera/microphone require localhost or HTTPS. Host the contents of `apps/web/out` at the root of any static HTTPS host to deploy later; no API server or database service is required. Changing the host/origin creates a separate browser library. See [deployment](docs/DEPLOYMENT.md).
 
-Workflow: add a course → create a session and confirm recording permission → record/upload audio → capture board photos and attach course PDFs/text → generate → review evidence and uncertain passages → export PDF. A supplied transcript can be edited and saved before generation; this skips audio transcription and is labeled as student-edited evidence.
-
-In live mode, public-source discovery searches the named course, university and professor using the selected provider's web search. Only returned HTTPS citation URLs are retained. It supplements course uploads with a **search summary**, not a verified copy of a syllabus or textbook. Open and verify the original links. The server never fetches arbitrary supplied URLs or bypasses restricted portals. Scanned PDFs need OCR before upload in this version.
-
-## Native Android
+## Build Android on Windows
 
 ```powershell
 .\scripts\setup-android.ps1
 .\scripts\build-android.ps1
 ```
 
-The setup installs the Android command-line SDK, platform 35, build tools 35.0.0 and platform tools under ignored `.tools`. It reuses an available JDK 21 or downloads Temurin 21. Gradle 8.11.1 is pinned through the committed wrapper; AGP is 8.9.2. The APK is copied to **`artifacts/SeviL-debug.apk`**. This is a debug build, not a store-signed release.
+The SDK is installed under ignored `.tools`; JDK 21, platform 35, build tools 35.0.0 and Gradle 8.11.1 are used. The installable test APK is copied to `artifacts/SeviL-debug.apk`. The setup uses `android sdk install` when available, with an older `sdkmanager` fallback. Its deprecation notice is not an installation failure.
 
-Setup uses the current `android sdk install` command when available and verifies the required tools before reporting success. Older SDK installations fall back to `sdkmanager`; its deprecation notice is not a build failure. A successful setup finishes with `Android tools ready` and the next build command.
+GitHub needs a persistent test signing key to update APKs without uninstalling. See [release details](docs/RELEASES.md). Physical microphone/camera/background behavior still needs testing on target devices.
 
-To connect a USB phone without opening a network port:
-
-```powershell
-.\.tools\android-sdk\platform-tools\adb.exe reverse tcp:8000 tcp:8000
-```
-
-Set the app's server URL to `http://127.0.0.1:8000`. For an emulator use `http://10.0.2.2:8000`. Other HTTP hosts are intentionally blocked; use HTTPS for remote servers. A physical phone/emulator is needed to verify microphone, camera, calls, and background behavior. Android's foreground recorder stores audio in private app storage; pending recordings remain there until a successful retry upload. Clearing app storage or uninstalling deletes them.
-
-## Native iOS source
-
-On a Mac with Xcode and XcodeGen:
+## Build iOS on a Mac
 
 ```bash
 brew install xcodegen
@@ -72,43 +64,32 @@ xcodegen generate
 open SeviL.xcodeproj
 ```
 
-Select your signing team and an iPhone/iPad, then build. `project.yml` is the source of the Xcode project and Info.plist. The generated `.xcodeproj` is not committed. iOS 17+ is supported. Simulator defaults to `http://localhost:8000`; a real device should use the HTTPS API URL in Settings. Tokens are stored in Keychain. Recordings are retained in private application storage until uploaded. The in-app camera explicitly avoids owning the microphone's audio session.
+Select your Apple signing team and device in Xcode. iOS/iPadOS 17+ is supported. The source is maintained on Windows; compilation and simulator tests run on GitHub's macOS runner. The in-app camera avoids taking over the microphone audio session.
 
-## What is implemented
+## Workflow and limits
 
-- Reusable course profiles: university, program, professor, course code, lecture language and note language.
-- Shared persistent sessions, consent acknowledgment, original files, editable transcripts, sources and notes.
-- Audio recording, independent board capture, manual uploads, capture timestamps, and pending-audio recovery in all clients.
-- Selectable OpenAI/Gemini/Claude notes, OpenAI/Gemini transcription, contextual terminology hints, public-source search, image input, structured notes and citation validation.
-- Bilingual glossary, learning objectives, review questions, uncertainty list and PDF handouts with original board images.
-- English, Turkish, Simplified Chinese, Japanese, Korean, German, French, Spanish interfaces from one catalog.
-- Local development scripts, deployment containers and CI checks for web, server, Android and iOS.
+Add a course → create a session and confirm permission to record → record/upload audio → capture timestamped board photos and attach PDFs/text → generate → check sources and uncertainties → export PDF. A saved student-edited transcript skips transcription and has no verified audio alignment. “Try a sample lecture” creates explicitly synthetic notes offline.
 
-## Current limits
+- All clients offer OpenAI, Gemini and Claude. Gemini supports audio and notes. Claude needs an explicitly chosen Gemini/OpenAI transcription provider or a saved transcript. No silent provider fallback.
+- Public source search is an explicit action and caches a summary and returned HTTPS links for that course/provider. Verify original links. It does not automatically retrieve university portals, licensed textbooks, or a professor's private materials.
+- Original audio and photos are preserved. Transcription references identify whole audio clips and their start times, not word-level alignment. Photo timestamps indicate capture time, not when the board was written.
+- Maximum stored audio attachment: 250 MiB. OpenAI transcription accepts files below 24 MiB in this version; choose Gemini or split longer audio manually. Gemini uses temporary provider file uploads for larger recordings and attempts to delete those copies afterward.
+- Other attachments: 20 MiB each, combined binary attachments 30 MiB, 20 board photos. Native clients accept PDFs up to 300 pages; browser PDF page counts are not prevalidated, so use short chapters. Whole documents are passed to the model, not a verified page-level retrieval pipeline. Account/model limits can be lower.
+- Native clients create PDFs locally; web uses the browser's Print/Save as PDF dialog. PDF section labels currently use English; content follows the course's requested note language. Native fonts support the device's language fonts; inspect exported non-Latin text on intended readers.
+- AI processing runs in the foreground app/tab and can be interrupted by OS suspension or closing. A restart marks unfinished jobs failed so they can be retried; originals remain. Browser recording checkpoints are written every 10 seconds. Abrupt termination can lose the last checkpoint or leave an incomplete audio container.
+- No cloud sync, hosted authentication, full library backup, live captions, offline AI, production signing, or billing yet. Real classroom accuracy and physical-device recording require further validation.
 
-This is a **single-user pilot**, not a finished multi-tenant university service. One configured server token grants access to the whole workspace; there are no separate student accounts yet. Do not share that token among unrelated students. See [deployment](docs/DEPLOYMENT.md) before hosting.
-
-- No universal university/LMS login integration, licensed textbook retrieval, or professor voice enrollment/separation.
-- Audio is transcribed in approximately five-minute segments; references are **coarse segment starts**, not word alignment. Student-edited transcripts have no verified audio alignment.
-- Photo timestamps reflect capture time, not when the board was written. Native/browser recording can be interrupted; inspect recovered files after an interruption. Recovery does not guarantee that an unfinalized audio container is playable.
-- Browser recovery checkpoints are written every 10 seconds. An abrupt exit can lose the final checkpoint and may leave an incomplete recording. Keep the page open and stop/save normally.
-- Maximum audio upload: 250 MiB; other files: 20 MiB; 20 board photos per live handout; 300 pages per PDF. Retrieval selects at most five pages per resource and 30 resource excerpts overall. This is lexical retrieval, not exhaustive textbook interpretation.
-- PDF headings are currently English; content follows the configured output language in live mode. CJK PDFs use standard CID fonts and should be checked on intended readers.
-- Jobs run in the API process. A restart marks interrupted jobs as failed for a manual retry; there is no distributed queue yet. Use a single API process.
-- No live captions, fully offline AI, billing, push notifications, or app-store release signing yet.
-
-## Checks and project policy
+## Checks and shared contracts
 
 ```powershell
 $env:PYTHONPATH='services/api'
-.\.venv\Scripts\python.exe -m pytest services/api/tests -q
+.\.venv\Scripts\python.exe -m pytest services/api/tests scripts/tests -q
 python scripts/sync-locales.py --check
-python scripts/export-contract.py --check
-cd apps/web
-npm run typecheck
-npm run build
+.\.venv\Scripts\python.exe scripts/sync-ai-contract.py --check
+.\.venv\Scripts\python.exe scripts/export-contract.py --check
+npm.cmd test --prefix apps/web
+npm.cmd run typecheck --prefix apps/web
+npm.cmd run build --prefix apps/web
 ```
 
-[AGENTS.md](AGENTS.md) requires platform parity for future changes. [docs/PARITY.md](docs/PARITY.md) records actual implementation and verification status. Shared translations are edited in `shared/locales.json`, then copied with `python scripts/sync-locales.py`. Generated copies are checked in CI. All clients consume the versioned API described in `shared/openapi.json`.
-
-Source repository: https://github.com/RmaNMetaverse/SeviLLearnCompanion
+Edit all eight interface languages in `shared/locales.json`, then run `python scripts/sync-locales.py`. AI schema/prompts/models are generated for all clients with `scripts/sync-ai-contract.py`. The retained server contract is `shared/openapi.json`. [AGENTS.md](AGENTS.md) requires feature parity and [docs/PARITY.md](docs/PARITY.md) records actual verification.

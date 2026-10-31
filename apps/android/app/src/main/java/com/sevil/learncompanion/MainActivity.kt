@@ -68,12 +68,12 @@ fun SevilApp() {
     var courses by remember { mutableStateOf(listOf<JSONObject>()) }
     var sessions by remember { mutableStateOf(listOf<JSONObject>()) }
     var publicSources by remember { mutableStateOf(listOf<JSONObject>()) }
-    var provider by remember { mutableStateOf(api.prefs.getString("provider", "openai") ?: "openai") }
+    var provider by remember { mutableStateOf(api.prefs.getString("provider", "gemini") ?: "gemini") }
     var audioProvider by remember { mutableStateOf(api.prefs.getString("audioProvider", "gemini") ?: "gemini") }
     var providers by remember { mutableStateOf(listOf<JSONObject>()) }
     fun generationOptions() = JSONObject().put("provider", provider).put("transcription_provider", if(provider == "claude") audioProvider else provider)
     var active by remember { mutableStateOf<JSONObject?>(null) }
-    var mode by remember { mutableStateOf("demo") }
+    var mode by remember { mutableStateOf("live") }
     var error by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var dialog by remember { mutableStateOf("") }
@@ -86,8 +86,9 @@ fun SevilApp() {
     var outputLang by remember { mutableStateOf("en") }
     var courseId by remember { mutableStateOf("") }
     var permission by remember { mutableStateOf(false) }
-    var server by remember { mutableStateOf(api.server) }
-    var token by remember { mutableStateOf(api.token) }
+    var geminiKey by remember { mutableStateOf(api.keys.read("gemini")) }
+    var openaiKey by remember { mutableStateOf(api.keys.read("openai")) }
+    var claudeKey by remember { mutableStateOf(api.keys.read("claude")) }
     var transcript by remember { mutableStateOf("") }
     var tab by remember { mutableStateOf("notes") }
     var photoOffset by remember { mutableStateOf("0") }
@@ -158,6 +159,7 @@ fun SevilApp() {
     Scaffold(topBar = { TopAppBar(title = { Text("SeviL", fontWeight = FontWeight.Bold) }, navigationIcon = { if(active != null) TextButton(enabled = !isRecording, onClick = { active = null; work { refresh() } }) { Text(t("back")) } }, actions = { TextButton(onClick = { dialog = "settings" }) { Text(t("settings")) } }) }) { insets ->
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(insets).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if(mode == "demo") Surface(color = Color(0xFFF1EDDF), shape = MaterialTheme.shapes.medium) { Text(t("demoNotice"), Modifier.padding(14.dp), style = MaterialTheme.typography.bodySmall) }
+            Text(t("deviceStorageNotice"), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             if(error.isNotEmpty()) Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) { Text(error, Modifier.padding(14.dp)) }
             if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -178,7 +180,7 @@ fun SevilApp() {
                 OutlinedButton(enabled = !busy, onClick = { work {
                     val c = courses.firstOrNull { it.optString("code") == "DEMO" } ?: JSONObject(api.json("/v1/courses", "POST", JSONObject().put("title", "Learning across languages").put("university", "SeviL sample university").put("code", "DEMO")))
                     val s = JSONObject(api.json("/v1/sessions", "POST", JSONObject().put("course_id", c.getString("id")).put("title", "From listening to understanding").put("recording_permission", true)))
-                    if(mode == "demo") api.json("/v1/sessions/${s.getString("id")}/generate", "POST", generationOptions())
+                    api.json("/v1/sessions/${s.getString("id")}/demo", "POST")
                     refresh(); open(s.getString("id"))
                 } }) { Text(t("demo")) }
                 Text(t("courses"), style = MaterialTheme.typography.titleLarge)
@@ -216,11 +218,11 @@ fun SevilApp() {
                     Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(asset.getString("name"), fontWeight = FontWeight.Medium)
                         Text(clock(asset.optLong("offset_ms")), style = MaterialTheme.typography.labelSmall)
-                        if(asset.getString("kind") == "photo") AsyncImage(model = ImageRequest.Builder(context).data(api.server + "/v1/assets/${asset.getString("id")}").addHeader("Authorization", "Bearer ${api.token}").build(), contentDescription = t("photo"), modifier = Modifier.fillMaxWidth().height(230.dp))
+                        if(asset.getString("kind") == "photo") AsyncImage(model = ImageRequest.Builder(context).data(api.assetFile(asset.getString("id"))).build(), contentDescription = t("photo"), modifier = Modifier.fillMaxWidth().height(230.dp))
                         else OutlinedButton(onClick = {
                             if(playingId == asset.getString("id")) { player?.release(); player = null; playingId = "" } else {
                                 player?.release()
-                                runCatching { player = MediaPlayer().apply { setDataSource(context, Uri.parse(api.server + "/v1/assets/${asset.getString("id")}"), mapOf("Authorization" to "Bearer ${api.token}")); setOnPreparedListener { it.start() }; setOnCompletionListener { playingId = "" }; prepareAsync() }; playingId = asset.getString("id") }.onFailure { error = it.message ?: t("error") }
+                                runCatching { player = MediaPlayer().apply { setDataSource(api.assetFile(asset.getString("id")).absolutePath); setOnPreparedListener { it.start() }; setOnCompletionListener { playingId = "" }; prepareAsync() }; playingId = asset.getString("id") }.onFailure { error = it.message ?: t("error") }
                             }
                         }) { Text(if(playingId == asset.getString("id")) "■" else "▶ " + t("audio")) }
                         TextButton(enabled = !disabled && !isRecording, onClick = { work { api.json("/v1/assets/${asset.getString("id")}", "DELETE"); open(id) } }) { Text(t("delete")) }
@@ -245,14 +247,14 @@ fun SevilApp() {
             when(dialog) {
                 "course" -> { OutlinedTextField(title, { title = it }, label = { Text(t("title")) }); OutlinedTextField(university, { university = it }, label = { Text(t("university")) }); OutlinedTextField(degree, { degree = it }, label = { Text(t("degree")) }); OutlinedTextField(professor, { professor = it }, label = { Text(t("professor")) }); OutlinedTextField(code, { code = it }, label = { Text(t("code")) }); LanguagePicker(t("lectureLanguage"), lectureLang) { lectureLang = it }; LanguagePicker(t("outputLanguage"), outputLang) { outputLang = it } }
                 "session" -> { courses.forEach { c -> Row { RadioButton(selected = courseId == c.getString("id"), onClick = { courseId = c.getString("id") }); Text(c.getString("title"), Modifier.padding(top = 12.dp)) } }; OutlinedTextField(title, { title = it }, label = { Text(t("sessionTitle")) }); Row { Checkbox(permission, { permission = it }); Text(t("permission"), style = MaterialTheme.typography.bodySmall) } }
-                else -> { LanguagePicker(t("language"), locale) { locale = it; api.prefs.edit().putString("locale", it).apply() }; OutlinedTextField(server, { server = it }, label = { Text(t("server")) }); OutlinedTextField(token, { token = it }, label = { Text(t("token")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()) }
+                else -> { LanguagePicker(t("language"), locale) { locale = it; api.prefs.edit().putString("locale", it).apply() }; Text(t("deviceStorageNotice"), style = MaterialTheme.typography.bodySmall); OutlinedTextField(geminiKey, { geminiKey = it }, label = { Text("Gemini " + t("apiKey")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()); OutlinedTextField(openaiKey, { openaiKey = it }, label = { Text("OpenAI " + t("apiKey")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()); OutlinedTextField(claudeKey, { claudeKey = it }, label = { Text("Claude " + t("apiKey")) }, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()) }
             }
         }
-    }, confirmButton = { TextButton(enabled = !busy && when(dialog) { "course" -> title.isNotBlank(); "session" -> title.isNotBlank() && courseId.isNotBlank() && permission; else -> server.startsWith("https://") || server.startsWith("http://") }, onClick = { work {
+    }, confirmButton = { TextButton(enabled = !busy && when(dialog) { "course" -> title.isNotBlank(); "session" -> title.isNotBlank() && courseId.isNotBlank() && permission; else -> true }, onClick = { work {
         when(dialog) {
             "course" -> { val c = JSONObject(api.json("/v1/courses", "POST", JSONObject().put("title", title).put("university", university).put("degree", degree).put("professor", professor).put("code", code).put("lecture_language", lectureLang).put("output_language", outputLang))); courseId = c.getString("id"); refresh() }
             "session" -> { val s = JSONObject(api.json("/v1/sessions", "POST", JSONObject().put("course_id", courseId).put("title", title).put("recording_permission", permission))); refresh(); open(s.getString("id")) }
-            else -> { api.server = server; api.token = token; refresh() }
+            else -> { api.keys.save("gemini",geminiKey); api.keys.save("openai",openaiKey); api.keys.save("claude",claudeKey); refresh() }
         }; dialog = ""
     } }) { Text(t("save")) } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text(t("cancel")) } })
     if(dialog == "camera") AlertDialog(onDismissRequest = { dialog = "" }, confirmButton = {}, text = { BoardCamera(t("capture"), t("close"), offset = { if(isRecording) recording.offset + SystemClock.elapsedRealtime() - recording.started else (photoOffset.toLongOrNull() ?: 0) * 1000 }, onPhoto = { file, offset -> work { upload(file, "photo", file.name, offset); file.delete() } }, onError = { error = it }, close = { dialog = "" }) })

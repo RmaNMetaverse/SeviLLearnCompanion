@@ -1,46 +1,19 @@
-# AI service selection
+# AI providers on each device
 
-Android, iOS and web expose an **AI service** dropdown: OpenAI, Gemini and Claude. The choice is retained on the client and sent explicitly with generation and source-search requests. The server reports which providers have a key configured, never the key itself. The initial client default comes from `SEVIL_DEFAULT_PROVIDER`; a saved choice takes precedence.
+All three clients offer OpenAI, Gemini and Claude in the same service dropdown. Open Settings and enter your own key for the service you select. Gemini is the default. The provider catalog means a key is present on this device; API validity, model access and quota are checked when a request is made. The app never silently switches providers.
 
-| Provider | Audio transcription | Notes and board images | PDF |
+| Service | Notes and images/PDFs | Audio | Public-source search |
 |---|---|---|---|
-| OpenAI | Configured OpenAI transcription model | OpenAI notes model | Created by SeviL |
-| Gemini | Gemini audio input | Gemini structured multimodal output | Created by SeviL |
-| Claude | Explicitly choose Gemini/OpenAI, or use a saved transcript | Claude image input and structured output | Created by SeviL |
+| Gemini | Direct generateContent with structured JSON | Gemini audio input, temporary Files API upload for larger clips | Google Search grounding |
+| OpenAI | Direct Responses API with JSON schema | Direct gpt-transcribe, under 24 MiB per file | Responses web search |
+| Claude | Direct Messages API with structured output | Use explicitly chosen Gemini/OpenAI, or save a transcript | Claude web search |
 
-Claude's Messages integration has no audio input. When Claude is selected, clients display an **Audio service** dropdown. Direct API requests without an explicit audio provider and without a saved transcript are rejected before a provider call. There is no silent cross-provider fallback on missing keys, failures or quota errors. A saved transcript is reused without retranscribing, even when the notes provider changes.
+Models and shared instructions live in generated `shared/ai-contract.json`; update its generator `scripts/sync-ai-contract.py` and synchronize all three copies. Current notes models: `gemini-3.5-flash-lite`, `gpt-4.1`, `claude-sonnet-5-5`. Account availability and provider limits apply.
 
-## Server configuration
+Gemini can transcribe audio and interpret board photos/PDF resources. The app creates the PDF itself; Gemini returns structured note content, not a finished PDF. Free key issuance does not guarantee unlimited free requests. Provider errors are shown and original files stay saved.
 
-Keep keys only in the server's ignored `.env` or hosting secret store, never client code, Git or releases.
+Android stores encrypted credentials with Android Keystore; iOS uses Keychain. Web keys stay in this tab's memory only and clear on reload/close. Credentials are sent in HTTPS authorization headers to the selected provider, never in URLs. The public app does not contain a developer's shared API secret. The laptop's ignored `.env` cannot configure an independent phone.
 
-```dotenv
-SEVIL_MODE=live
-SEVIL_DEFAULT_PROVIDER=gemini
-GEMINI_API_KEY=your-local-secret
-GEMINI_MODEL=gemini-3.5-flash-lite
-GEMINI_TRANSCRIPTION_MODEL=gemini-3.5-flash-lite
-OPENAI_API_KEY=
-OPENAI_TRANSCRIPTION_MODEL=gpt-transcribe
-OPENAI_NOTES_MODEL=gpt-4.1
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=claude-sonnet-5-5
-```
+The app sends selected lecture evidence to the selected provider when generating, and course details when searching. Gemini's larger audio upload is temporary; deletion is attempted after processing, but the provider's own processing/retention policies apply. An interrupted app may prevent immediate cleanup. Browser cross-origin permissions or provider restrictions may prevent a request; use a native client or shorter recording when a large-file browser upload is unavailable.
 
-Restart the API after changing configuration. Model access and quota depend on the account. A free API key does not guarantee unlimited or permanently free requests. Audio, notes and web search each consume provider quota. Gemini-only sessions need no OpenAI requests; PDF rendering needs no external AI API.
-
-Demo mode still generates explicitly synthetic content without provider calls. Live notes record the actual provider, display it in all clients and include it in the PDF. Public-source caches are isolated by course and provider.
-
-## Verification
-
-The supplied Gemini key was saved only in the ignored local environment file. A live Gemini-only smoke test passed with synthetic speech about cell biology, a synthetic board image and a text resource: transcription → structured notes with validated references → a two-page PDF containing the board image. The model was `gemini-3.5-flash-lite`. This does not establish real-classroom accuracy, long-session reliability or free-tier limits.
-
-OpenAI and Claude adapter routing, image formatting, missing-key behavior and no-fallback handling have automated tests; their live requests were not tested with personal credentials in this change. `scripts/smoke-gemini.py` is an explicit opt-in live check using synthetic fixtures, excluded from CI. GitHub Actions receives no local API key.
-
-## References
-
-- [Gemini audio](https://ai.google.dev/gemini-api/docs/audio)
-- [Gemini GenerateContent API](https://ai.google.dev/api/generate-content)
-- [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output)
-- [Claude Messages API](https://platform.claude.com/docs/en/api/messages)
-- [Claude structured output](https://platform.claude.com/docs/en/build-with-claude/structured-outputs)
+Original recordings, clip-level transcript references, timestamped images, supporting resources and additional AI explanations remain distinguishable. Invalid source IDs prevent publishing a handout. These checks do not establish factual accuracy; review uncertainties and compare originals.

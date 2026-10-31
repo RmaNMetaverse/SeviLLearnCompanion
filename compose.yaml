@@ -1,5 +1,6 @@
 services:
   api:
+    profiles: [legacy-api]
     build:
       context: .
       dockerfile: services/api/Dockerfile
@@ -16,13 +17,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      args:
-        API_INTERNAL_URL: http://api:8000
-    environment:
-      API_INTERNAL_URL: http://api:8000
     ports:
       - "127.0.0.1:3000:3000"
-    depends_on: [api]
     restart: unless-stopped
 volumes:
   sevil-data:

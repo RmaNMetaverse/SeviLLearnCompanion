@@ -25,6 +25,13 @@ import {
   X,
 } from "lucide-react";
 import catalog from "../shared-locales.json";
+import {
+  localRequest,
+  assetBlob,
+  setDeviceKey,
+  deviceKey,
+  printHandout,
+} from "../lib/device-workspace";
 import type { Course, Session, Asset } from "../lib/types";
 import {
   clips,
@@ -66,8 +73,10 @@ const time = (ms: number) =>
   `${String(Math.floor(ms / 60000)).padStart(2, "0")}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 
 export default function Home() {
-  const [locale, setLocale] = useState<Locale>("en"),
-    [token, setToken] = useState("");
+  const [locale, setLocale] = useState<Locale>("en");
+  const [geminiKey, setGeminiKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [claudeKey, setClaudeKey] = useState("");
   const [courses, setCourses] = useState<Course[]>([]),
     [sessions, setSessions] = useState<Session[]>([]),
     [active, setActive] = useState<Session | null>(null);
@@ -92,7 +101,7 @@ export default function Home() {
     [camera, setCamera] = useState(false),
     [pending, setPending] = useState<SavedClip[]>([]);
   const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
-  const [provider, setProvider] = useState<Provider>("openai");
+  const [provider, setProvider] = useState<Provider>("gemini");
   const [audioProvider, setAudioProvider] = useState<"openai" | "gemini">(
     "gemini",
   );
@@ -113,20 +122,7 @@ export default function Home() {
     recordingSession = useRef("");
   const t = (key: Key) => catalog[locale][key] || catalog.en[key];
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const headers = new Headers(init.headers);
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-    if (init.body && !(init.body instanceof FormData))
-      headers.set("Content-Type", "application/json");
-    const r = await fetch(`/api${path}`, { ...init, headers });
-    if (!r.ok) {
-      const body = await r.json().catch(() => null);
-      throw Error(
-        typeof body?.detail === "string"
-          ? body.detail
-          : `${t("error")} (${r.status})`,
-      );
-    }
-    return r.status === 204 ? (undefined as T) : r.json();
+    return (await localRequest(path, init)) as T;
   }
   async function action(fn: () => Promise<void>) {
     setError("");
@@ -167,9 +163,12 @@ export default function Home() {
     setPublicSources(found.links);
   }
   useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator)
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
+  useEffect(() => {
     const saved = localStorage.getItem("sevil-locale");
     if (saved && saved in catalog) setLocale(saved as Locale);
-    setToken(sessionStorage.getItem("sevil-token") || "");
     const savedProvider = localStorage.getItem("sevil-provider");
     if (savedProvider && ["openai", "gemini", "claude"].includes(savedProvider))
       setProvider(savedProvider as Provider);
@@ -179,7 +178,7 @@ export default function Home() {
   }, []);
   useEffect(() => {
     action(refresh); /* credentials change triggers fresh reads */
-  }, [token]); // eslint-disable-line
+  }, []); // eslint-disable-line
   useEffect(() => {
     document.documentElement.lang = locale;
     localStorage.setItem("sevil-locale", locale);
@@ -232,11 +231,7 @@ export default function Home() {
         (active.assets || [])
           .filter((a) => a.kind !== "resource")
           .map(async (a) => {
-            const r = await fetch(`/api/v1/assets/${a.id}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-            });
-            if (!r.ok) return;
-            const u = URL.createObjectURL(await r.blob());
+            const u = URL.createObjectURL(await assetBlob(a.id));
             urls.push(u);
             if (!cancelled) setMediaUrls((prev) => ({ ...prev, [a.id]: u }));
           }),
@@ -246,7 +241,7 @@ export default function Home() {
       cancelled = true;
       urls.forEach(URL.revokeObjectURL);
     };
-  }, [active?.id, active?.assets?.length, token]);
+  }, [active?.id, active?.assets?.length]);
   const currentCourse = courses.find((c) => c.id === active?.course_id);
   const audioEnd = Math.max(
     0,
@@ -302,7 +297,7 @@ export default function Home() {
     );
     const r = new MediaRecorder(
       stream,
-      mime ? { mimeType: mime, audioBitsPerSecond: 96000 } : undefined,
+      mime ? { mimeType: mime, audioBitsPerSecond: 48000 } : undefined,
     );
     recorder.current = r;
     const parts: Blob[] = [];
@@ -392,17 +387,7 @@ export default function Home() {
     closeCamera();
   }
   async function download() {
-    if (!active) return;
-    const r = await fetch(`/api/v1/sessions/${active.id}/handout.pdf`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!r.ok) throw Error(t("error"));
-    const url = URL.createObjectURL(await r.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sevil-handout.pdf";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (active) await printHandout(active.id);
   }
   async function sample() {
     let c = courses.find((c) => c.code === "DEMO");
@@ -427,13 +412,9 @@ export default function Home() {
     });
     await refresh();
     await openSession(s.id);
-    if (health?.mode === "demo") {
-      await request(`/v1/sessions/${s.id}/generate`, {
-        method: "POST",
-        body: JSON.stringify(generationOptions()),
-      });
-      await openSession(s.id);
-    }
+    await request(`/v1/sessions/${s.id}/demo`, { method: "POST" });
+    await openSession(s.id);
+    await refresh();
   }
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -462,11 +443,10 @@ export default function Home() {
         await openSession(s.id);
       }
       if (modal === "settings") {
-        const input = document.getElementById(
-          "access-token",
-        ) as HTMLInputElement;
-        sessionStorage.setItem("sevil-token", input.value);
-        setToken(input.value);
+        setDeviceKey("gemini", geminiKey);
+        setDeviceKey("openai", openaiKey);
+        setDeviceKey("claude", claudeKey);
+        await refresh();
       }
       setModal(null);
     });
@@ -584,7 +564,7 @@ export default function Home() {
             {langSelect(locale, (v) => setLocale(v as Locale))}
             <span
               className="status-dot"
-              title={health ? "Server connected" : "Connecting"}
+              title={health ? "Device library ready" : "Opening device library"}
             />
           </div>
         </header>
@@ -657,6 +637,7 @@ export default function Home() {
               )}
             </p>
           </section>
+          <p className="muted">{t("deviceStorageNotice")}</p>
           {!active ? (
             <>
               <div className="page-heading">
@@ -1467,15 +1448,35 @@ export default function Home() {
                     {t("language")}
                     {langSelect(locale, (v) => setLocale(v as Locale))}
                   </label>
+                  <p className="muted">{t("deviceStorageNotice")}</p>
                   <label>
-                    {t("token")}
+                    Gemini {t("apiKey")}
                     <input
-                      id="access-token"
                       type="password"
                       autoComplete="off"
-                      defaultValue={token}
+                      value={geminiKey}
+                      onChange={(e) => setGeminiKey(e.target.value)}
                     />
                   </label>
+                  <label>
+                    OpenAI {t("apiKey")}
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Claude {t("apiKey")}
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={claudeKey}
+                      onChange={(e) => setClaudeKey(e.target.value)}
+                    />
+                  </label>
+                  <p className="muted">{t("browserKeyNotice")}</p>
                   <p className="muted">{t("local")}</p>
                 </>
               )}

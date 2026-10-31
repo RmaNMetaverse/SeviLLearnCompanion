@@ -5,12 +5,12 @@ import SwiftUI
     @Published var courses: [Course] = []
     @Published var sessions: [LectureSession] = []
     @Published var active: LectureSession?
-    @Published var mode = "demo"
+    @Published var mode = "live"
     @Published var error = ""
     @Published var busy = false
     @Published var publicSources: [PublicLink] = []
     @Published var providers: [AIProvider] = []
-    @Published var provider = UserDefaults.standard.string(forKey:"provider") ?? "openai" { didSet { UserDefaults.standard.set(provider,forKey:"provider") } }
+    @Published var provider = UserDefaults.standard.string(forKey:"provider") ?? "gemini" { didSet { UserDefaults.standard.set(provider,forKey:"provider") } }
     @Published var audioProvider = UserDefaults.standard.string(forKey:"audioProvider") ?? "gemini" { didSet { UserDefaults.standard.set(audioProvider,forKey:"audioProvider") } }
     var generationOptions: [String:Any] { ["provider":provider,"transcription_provider":provider == "claude" ? audioProvider : provider] }
     @Published var locale: String = UserDefaults.standard.string(forKey: "locale") ?? "en" {
@@ -55,7 +55,7 @@ import SwiftUI
         if let existing = courses.first(where: { $0.code == "DEMO" }) { course = existing }
         else { course = try await createCourse(["title":"Learning across languages","university":"SeviL sample university","code":"DEMO"]) }
         try await createSession(course: course.id, title: "From listening to understanding", permission: true)
-        if mode == "demo" { try await generate() }
+        if let active { _=try await api.data("/v1/sessions/\(active.id)/demo",method:"POST",json:[:]);try await open(active.id);try await refresh() }
     }
     func generate() async throws { guard let active else { return }; _ = try await api.data("/v1/sessions/\(active.id)/generate", method:"POST", json:generationOptions); try await open(active.id) }
     func upload(_ file: URL, kind: String, name: String? = nil, offset: Int = 0, duration: Int = 0) async throws {
