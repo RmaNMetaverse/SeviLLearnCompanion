@@ -2,6 +2,10 @@
 
 A multilingual lecture companion for international students. Native **Kotlin/Compose Android**, native **Swift/SwiftUI iOS**, and **Next.js web** clients share one Python API and eight interface languages.
 
+## Download builds
+
+Every successful push to `main` automatically publishes a [GitHub development release](https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases) after all platform checks pass. Downloads include an installable Android debug APK, an iOS simulator app, an **unsigned** iOS device IPA, and a compiled web server. The device IPA needs Apple signing/provisioning before it can be installed on an iPhone. See [release and installation details](docs/RELEASES.md).
+
 ## Run on Windows
 
 Requirements: Python 3.12+, Node.js 22+, Git. The initial setup has already been performed on the development laptop.
@@ -43,6 +47,8 @@ In live mode, public-source discovery searches the named course, university and 
 ```
 
 The setup installs the Android command-line SDK, platform 35, build tools 35.0.0 and platform tools under ignored `.tools`. It reuses an available JDK 21 or downloads Temurin 21. Gradle 8.11.1 is pinned through the committed wrapper; AGP is 8.9.2. The APK is copied to **`artifacts/SeviL-debug.apk`**. This is a debug build, not a store-signed release.
+
+Setup uses the current `android sdk install` command when available and verifies the required tools before reporting success. Older SDK installations fall back to `sdkmanager`; its deprecation notice is not a build failure. A successful setup finishes with `Android tools ready` and the next build command.
 
 To connect a USB phone without opening a network port:
 

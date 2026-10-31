@@ -1,4 +1,4 @@
-name: Verify all platforms
+name: Build and release all platforms
 on:
   push:
     branches: [main]
@@ -6,9 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: verify-${{ github.ref }}
-  cancel-in-progress: true
+# Each pushed revision completes independently, even if another push arrives.
 jobs:
   api:
     runs-on: ubuntu-latest
@@ -22,7 +20,7 @@ jobs:
       - run: pip install -r services/api/requirements.txt
       - run: python scripts/sync-locales.py --check
       - run: python scripts/export-contract.py --check
-      - run: python -m pytest services/api/tests -q
+      - run: python -m pytest services/api/tests scripts/tests -q
         env:
           PYTHONPATH: services/api
   web:
@@ -40,6 +38,16 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Package runnable web server
+        run: |
+          mkdir -p release .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+          tar -czf release/SeviL-web-server.tar.gz -C .next/standalone .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SeviL-Web
+          path: apps/web/release/SeviL-web-server.tar.gz
+          if-no-files-found: error
   android:
     runs-on: ubuntu-latest
     steps:
@@ -53,15 +61,81 @@ jobs:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x apps/android/gradlew
+      - name: Restore optional persistent Android test signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            mkdir -p "$HOME/.android"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+            chmod 600 "$HOME/.android/debug.keystore"
+          fi
       - run: apps/android/gradlew -p apps/android assembleDebug --console=plain
+        env:
+          SEVIL_BUILD_NUMBER: ${{ github.run_number }}
+      - name: Prepare Android download
+        run: |
+          mkdir -p release
+          cp apps/android/app/build/outputs/apk/debug/app-debug.apk release/SeviL-Android-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: SeviL-Android-debug
-          path: apps/android/app/build/outputs/apk/debug/app-debug.apk
+          path: release/SeviL-Android-debug.apk
+          if-no-files-found: error
   ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - run: brew install xcodegen
       - run: xcodegen generate --spec apps/ios/project.yml
-      - run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/SeviLDerivedData CODE_SIGNING_ALLOWED=NO build
+      - name: Build iOS simulator app
+        run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/SeviLSimulator CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
+      - name: Build unsigned iOS device app
+        run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/SeviLDevice CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
+      - name: Package iOS downloads
+        run: |
+          mkdir -p release "$RUNNER_TEMP/SeviLPackage/Payload"
+          ditto -c -k --keepParent /tmp/SeviLSimulator/Build/Products/Debug-iphonesimulator/SeviL.app release/SeviL-iOS-simulator.zip
+          ditto /tmp/SeviLDevice/Build/Products/Release-iphoneos/SeviL.app "$RUNNER_TEMP/SeviLPackage/Payload/SeviL.app"
+          (cd "$RUNNER_TEMP/SeviLPackage" && zip -q -r "$GITHUB_WORKSPACE/release/SeviL-iOS-unsigned.ipa" Payload)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SeviL-iOS
+          path: |
+            release/SeviL-iOS-simulator.zip
+            release/SeviL-iOS-unsigned.ipa
+          if-no-files-found: error
+  release:
+    name: Publish downloadable development release
+    needs: [api, web, android, ios]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: SeviL-*
+          path: release
+          merge-multiple: true
+      - name: Prepare release metadata and checksums
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          python scripts/prepare-release.py
+          (cd release && sha256sum SeviL-* build-manifest.json INSTALLATION.md > SHA256SUMS.txt)
+      - name: Publish release after all assets are uploaded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG="build-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
+          TITLE="SeviL development build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA:0:7})"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TITLE" --draft --prerelease --latest=false --notes-file release-notes.md
+          fi
+          gh release upload "$TAG" release/* --clobber
+          gh release edit "$TAG" --draft=false --prerelease --latest=false --title "$TITLE" --notes-file release-notes.md
+          echo "### Downloads" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"

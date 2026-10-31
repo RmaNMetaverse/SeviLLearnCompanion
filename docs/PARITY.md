@@ -15,6 +15,7 @@ Every product change must preserve equivalent user-visible behavior across Andro
 | Session and asset deletion | Implemented | Implemented | Source implemented |
 | Eight-language interface | Shared catalog | Shared catalog | Shared catalog |
 | Server token | Browser session | Private app preferences | Keychain |
+| Automatic GitHub prerelease downloads | Standalone server archive | Debug-signed APK | Simulator app + unsigned device IPA |
 
 ## Verification
 
@@ -29,3 +30,5 @@ Every product change must preserve equivalent user-visible behavior across Andro
 ## Release rule
 
 No feature is production-verified merely because source compiles. Shared language catalogs must pass `scripts/sync-locales.py --check`. CI must check the API contract and compile the three clients. Record platform-specific limitations rather than silently removing a feature from one client.
+
+Each successful pushed `main` revision publishes the corresponding web, Android and iOS assets together. Release publication waits for the shared API checks and all three platform builds. See [RELEASES.md](RELEASES.md) for the difference between simulator, unsigned device and signed installable packages.

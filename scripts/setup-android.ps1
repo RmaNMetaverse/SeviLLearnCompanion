@@ -7,6 +7,9 @@ New-Item -ItemType Directory -Force -Path "$toolsDir\downloads", "$sdkDir\cmdlin
 if (!$env:JAVA_HOME -or !(Test-Path "$env:JAVA_HOME\bin\java.exe")) {
     $candidates = @('C:\Program Files\Android\openjdk\jdk-21.0.8', 'C:\Program Files\Android\Android Studio\jbr')
     $jdkPath = $candidates | Where-Object { Test-Path "$_\bin\java.exe" } | Select-Object -First 1
+    if (!$jdkPath -and (Test-Path "$toolsDir\jdk")) {
+        $jdkPath = Get-ChildItem -LiteralPath "$toolsDir\jdk" -Directory | Where-Object { Test-Path "$($_.FullName)\bin\java.exe" } | Select-Object -First 1 -ExpandProperty FullName
+    }
     if (!$jdkPath) {
         $archive = "$toolsDir\downloads\jdk.zip"
         Invoke-WebRequest 'https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jdk/hotspot/normal/eclipse' -OutFile $archive
@@ -24,8 +27,20 @@ if (!(Test-Path "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat")) {
     Expand-Archive -LiteralPath $archive -DestinationPath "$toolsDir\android-cli" -Force
     Move-Item -LiteralPath "$toolsDir\android-cli\cmdline-tools" -Destination "$sdkDir\cmdline-tools\latest"
 }
-1..100 | ForEach-Object { 'y' } | & "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat" --sdk_root=$sdkDir --licenses | Out-Null
-& "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat" --sdk_root=$sdkDir 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+$androidCli = Join-Path $sdkDir 'cmdline-tools\latest\bin\android.exe'
+if (Test-Path -LiteralPath $androidCli) {
+    Write-Output 'Checking Android SDK packages with Android CLI...'
+    1..100 | ForEach-Object { 'y' } | & $androidCli --no-metrics --sdk=$sdkDir sdk install 'platform-tools' 'platforms/android-35' 'build-tools/35.0.0'
+} else {
+    Write-Output 'Using legacy SDK manager because this SDK has no Android CLI.'
+    1..100 | ForEach-Object { 'y' } | & "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat" --sdk_root=$sdkDir --licenses | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Android SDK license setup failed' }
+    & "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat" --sdk_root=$sdkDir 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0'
+}
 if ($LASTEXITCODE -ne 0) { throw 'Android SDK installation failed' }
+foreach ($requiredFile in @('platform-tools\adb.exe', 'platforms\android-35\android.jar', 'build-tools\35.0.0\aapt2.exe')) {
+    if (!(Test-Path -LiteralPath (Join-Path $sdkDir $requiredFile))) { throw "Android setup is incomplete: missing $requiredFile" }
+}
 Set-Content -LiteralPath 'apps\android\local.properties' -Value ('sdk.dir=' + $sdkDir.Replace('\','/'))
 Write-Output "Android tools ready. JAVA_HOME=$env:JAVA_HOME"
+Write-Output 'Next: .\scripts\build-android.ps1'
