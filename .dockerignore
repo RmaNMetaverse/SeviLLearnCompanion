@@ -1,0 +1,11 @@
+.git
+.tools
+.venv
+.env
+data
+artifacts
+**/node_modules
+**/.next
+**/build
+**/.gradle
+**/local.properties
