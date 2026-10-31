@@ -19,14 +19,19 @@ enum Keychain {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return "" }
         return String(data: data, encoding: .utf8) ?? ""
     }
-    static func save(_ value: String, account: String = "server") {
+    static func save(_ value: String, account: String = "server") throws {
         let value=value.trimmingCharacters(in:.whitespacesAndNewlines)
         let query: [String: Any] = [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:account]
-        SecItemDelete(query as CFDictionary)
-        guard !value.isEmpty else { return }
+        guard !value.isEmpty else {
+            let status=SecItemDelete(query as CFDictionary)
+            guard status==errSecSuccess || status==errSecItemNotFound else { throw APIError.message("Cannot clear the saved key (Keychain \(status))") }
+            return
+        }
         var item = query
         item[kSecValueData as String] = Data(value.utf8)
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(item as CFDictionary, nil)
+        var status=SecItemUpdate(query as CFDictionary,[kSecValueData as String:Data(value.utf8)] as CFDictionary)
+        if status==errSecItemNotFound { status=SecItemAdd(item as CFDictionary,nil) }
+        guard status==errSecSuccess else { throw APIError.message("Cannot save the API key securely (Keychain \(status)). Check that this app was signed correctly.") }
     }
 }

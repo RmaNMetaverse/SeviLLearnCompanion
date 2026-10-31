@@ -124,13 +124,13 @@ jobs:
       - run: brew install xcodegen
       - run: xcodegen generate --spec apps/ios/project.yml
       - name: Build iOS simulator app
-        run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/SeviLSimulator CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
+        run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/SeviLSimulator CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY="-" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
       - name: Build unsigned iOS device app
         run: xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/SeviLDevice CODE_SIGNING_ALLOWED=NO CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" build
       - name: Test independent iOS library and PDF export
         run: |
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; print(next(d["udid"] for group in json.load(sys.stdin)["devices"].values() for d in group if d["name"].startswith("iPhone")))')
-          xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath /tmp/SeviLTests CODE_SIGNING_ALLOWED=NO test
+          xcodebuild -project apps/ios/SeviL.xcodeproj -scheme SeviL -configuration Debug -destination "platform=iOS Simulator,id=$DEVICE_ID" -derivedDataPath /tmp/SeviLTests CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY="-" -parallel-testing-enabled NO test
       - name: Package iOS downloads
         run: |
           mkdir -p release "$RUNNER_TEMP/SeviLPackage/Payload"

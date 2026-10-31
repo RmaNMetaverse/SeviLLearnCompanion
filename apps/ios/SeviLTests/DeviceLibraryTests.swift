@@ -21,7 +21,7 @@ final class DeviceLibraryTests: XCTestCase {
         let _: LectureSession=try await api.get("/v1/sessions/"+session.id+"/demo",method:"POST",json:[:])
         let pdf=try await api.data("/v1/sessions/"+session.id+"/handout.pdf")
         XCTAssertGreaterThan(try XCTUnwrap(PDFDocument(data:pdf)).pageCount,0)
-        Keychain.save("",account:"gemini")
+        try Keychain.save("",account:"gemini")
         do {
             let _: LectureSession=try await api.get("/v1/sessions/"+session.id+"/generate",method:"POST",json:["provider":"gemini"])
             XCTFail("Missing key should fail before network")
@@ -31,9 +31,9 @@ final class DeviceLibraryTests: XCTestCase {
         XCTAssertEqual(retained,bytes)
         _=try await api.data("/v1/assets/"+asset.id,method:"DELETE")
     }
-    func testDeviceKeyCanBeSavedAndCleared() {
-        Keychain.save("synthetic-not-a-secret",account:"gemini")
+    func testDeviceKeyCanBeSavedAndCleared() throws {
+        try Keychain.save("synthetic-not-a-secret",account:"gemini")
         XCTAssertEqual(Keychain.read("gemini"),"synthetic-not-a-secret")
-        Keychain.save("",account:"gemini");XCTAssertEqual(Keychain.read("gemini"),"")
+        try Keychain.save("",account:"gemini");XCTAssertEqual(Keychain.read("gemini"),"")
     }
 }

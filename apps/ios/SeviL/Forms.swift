@@ -62,7 +62,7 @@ struct SettingsView: View {
             if !model.error.isEmpty { Text(model.error).foregroundStyle(.red) }
         }.navigationTitle(model.t("settings")).toolbar {
             ToolbarItem(placement:.cancellationAction) { Button(model.t("cancel")) { dismiss() } }
-            ToolbarItem(placement:.confirmationAction) { Button(model.t("save")) { Keychain.save(geminiKey,account:"gemini"); Keychain.save(openaiKey,account:"openai"); Keychain.save(claudeKey,account:"claude"); model.run { try await model.refresh(); dismiss() } } }
+            ToolbarItem(placement:.confirmationAction) { Button(model.t("save")) { model.run { try Keychain.save(geminiKey,account:"gemini"); try Keychain.save(openaiKey,account:"openai"); try Keychain.save(claudeKey,account:"claude"); try await model.refresh(); dismiss() } } }
         } }
     }
 }
