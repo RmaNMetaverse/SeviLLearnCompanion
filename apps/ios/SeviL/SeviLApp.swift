@@ -77,7 +77,7 @@ struct SessionView: View {
     @State private var deleteConfirmation = false
     var session: LectureSession { model.active! }
     var assets: [Asset] { session.assets ?? [] }
-    var audioEnd: Int { assets.filter { $0.kind == "audio" }.map { $0.offset_ms + $0.duration_ms }.max() ?? 0 }
+    var audioEnd: Int { max(assets.filter { $0.kind == "audio" }.map { $0.offset_ms + $0.duration_ms }.max() ?? 0, recorder.pending.map { $0.offset + $0.duration }.max() ?? 0) }
     var disabled: Bool { model.busy || session.status == "processing" }
     var body: some View {
         VStack(alignment:.leading,spacing:20) {
@@ -124,7 +124,7 @@ struct SessionView: View {
         }
         .quickLookPreview($previewURL)
         .confirmationDialog(model.t("deleteConfirm"),isPresented:$deleteConfirmation,titleVisibility:.visible) {
-            Button(model.t("delete"),role:.destructive) { model.run { _ = try await model.api.data("/v1/sessions/\(session.id)",method:"DELETE"); model.active = nil; try await model.refresh() } }
+            Button(model.t("delete"),role:.destructive) { model.run { _ = try await model.api.data("/v1/sessions/\(session.id)",method:"DELETE"); let clips = recorder.pending; for clip in clips { recorder.remove(clip) }; model.active = nil; try await model.refresh() } }
         }
     }
     var recordingPanel: some View {

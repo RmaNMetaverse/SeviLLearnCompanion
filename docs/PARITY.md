@@ -18,10 +18,13 @@ Every product change must preserve equivalent user-visible behavior across Andro
 
 ## Verification
 
-- Shared API: local automated workflow/security/PDF tests.
+- Shared API: 16 local automated workflow/security/PDF tests, including upload retry deduplication and browser-origin rejection.
 - Web: TypeScript and production build; local browser verification.
 - Android: Windows debug APK build with the installed SDK. No physical device was connected during initial development; recording/camera runtime checks remain required.
-- iOS: Windows cannot run Xcode. A macOS build job is included in CI; do not claim a successful Apple build unless that job or a Mac build has actually passed. Physical iPhone/iPad checks remain required even after a successful simulator build.
+- iOS: the source compiled successfully with Xcode on GitHub's macOS runner in [run 41223414740](https://github.com/RmaNMetaverse/SeviLLearnCompanion/actions/runs/41223414740). Physical iPhone/iPad checks remain required. Windows itself did not run Xcode.
+- Web browser checks: generated sample handout, Turkish interface switch, phone-width layout without horizontal overflow, and a successful PDF download. Local screenshots are retained under ignored `artifacts/`.
+- Live OpenAI requests were not made: no API key was provided. API integration is implemented but real classroom accuracy, cost and latency remain unverified.
+- Docker deployment is configured but has not been run locally. Containers and public deployment need a separate environment check before use.
 
 ## Release rule
 

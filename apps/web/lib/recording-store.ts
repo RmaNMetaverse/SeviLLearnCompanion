@@ -1,6 +1,50 @@
 // IndexedDB recovery survives navigation and refresh; never store classroom audio in localStorage.
-export function database(): Promise<IDBDatabase> {return new Promise((resolve,reject)=>{const r=indexedDB.open("sevil-recordings",1);r.onupgradeneeded=()=>r.result.createObjectStore("clips",{keyPath:"id"});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
-export type SavedClip={id:string;sessionId:string;blob:Blob;offset:number;created:number;duration:number};
-export async function saveClip(clip:SavedClip){const db=await database();await new Promise<void>((res,rej)=>{const tx=db.transaction("clips","readwrite");tx.objectStore("clips").put(clip);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});db.close();}
-export async function clips(sessionId:string):Promise<SavedClip[]>{const db=await database();const all=await new Promise<SavedClip[]>((res,rej)=>{const r=db.transaction("clips").objectStore("clips").getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});db.close();return all.filter(c=>c.sessionId===sessionId).sort((a,b)=>a.created-b.created);}
-export async function removeClip(id:string){const db=await database();await new Promise<void>((res,rej)=>{const tx=db.transaction("clips","readwrite");tx.objectStore("clips").delete(id);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);});db.close();}
+export function database(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open("sevil-recordings", 1);
+    r.onupgradeneeded = () =>
+      r.result.createObjectStore("clips", { keyPath: "id" });
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+export type SavedClip = {
+  id: string;
+  sessionId: string;
+  blob: Blob;
+  offset: number;
+  created: number;
+  duration: number;
+};
+export async function saveClip(clip: SavedClip) {
+  const db = await database();
+  await new Promise<void>((res, rej) => {
+    const tx = db.transaction("clips", "readwrite");
+    tx.objectStore("clips").put(clip);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+  db.close();
+}
+export async function clips(sessionId: string): Promise<SavedClip[]> {
+  const db = await database();
+  const all = await new Promise<SavedClip[]>((res, rej) => {
+    const r = db.transaction("clips").objectStore("clips").getAll();
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  db.close();
+  return all
+    .filter((c) => c.sessionId === sessionId)
+    .sort((a, b) => a.created - b.created);
+}
+export async function removeClip(id: string) {
+  const db = await database();
+  await new Promise<void>((res, rej) => {
+    const tx = db.transaction("clips", "readwrite");
+    tx.objectStore("clips").delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+  db.close();
+}

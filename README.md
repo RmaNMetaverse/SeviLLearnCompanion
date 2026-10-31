@@ -15,6 +15,8 @@ Open **http://localhost:3000**. API documentation: http://localhost:8000/docs. `
 
 The application starts in **demo mode**. “Try a sample lecture” generates explicitly labeled synthetic content; it does **not** analyze recordings, photos, or attachments. You can exercise course/session creation, uploads, transcript editing, notes, and PDF download without a key. The sample handout is in English regardless of interface language.
 
+The initial implementation passed web, backend, Android and iOS build checks on GitHub. The Android APK was also built locally on Windows. This verifies builds, not microphone/camera behavior on physical devices. Live provider calls await your API key.
+
 ## Enable real AI processing
 
 Copy `.env.example` to `.env` if it does not exist. Edit it locally, never commit it:

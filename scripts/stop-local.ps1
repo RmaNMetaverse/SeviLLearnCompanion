@@ -6,7 +6,7 @@ if (Test-Path -LiteralPath $stateFile) {
     $snapshot = Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId
     foreach ($ownedProcess in $owned) {
         $process = Get-Process -Id $ownedProcess.pid -ErrorAction SilentlyContinue
-        if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $ownedProcess.started) {
+        if ($process -and $process.StartTime.ToUniversalTime().Ticks -eq ([DateTime]$ownedProcess.started).ToUniversalTime().Ticks) {
             $descendants = @()
             $frontier = @($process.Id)
             while ($frontier.Count -gt 0) {
@@ -15,7 +15,11 @@ if (Test-Path -LiteralPath $stateFile) {
                 $frontier = $children
             }
             Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-            foreach ($childId in $descendants) { Stop-Process -Id $childId -ErrorAction SilentlyContinue }
+            $process.WaitForExit(5000) | Out-Null
+            foreach ($childId in $descendants) {
+                $child = Get-Process -Id $childId -ErrorAction SilentlyContinue
+                if ($child) { Stop-Process -Id $child.Id -ErrorAction SilentlyContinue; $child.WaitForExit(5000) | Out-Null }
+            }
         }
     }
     Remove-Item -LiteralPath $stateFile

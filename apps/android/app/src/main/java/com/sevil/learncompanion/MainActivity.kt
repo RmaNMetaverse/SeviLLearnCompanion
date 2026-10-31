@@ -90,7 +90,7 @@ fun SevilApp() {
     val isRecording = recording.session.isNotBlank()
     val session = active
     val assets = session?.optJSONArray("assets")?.objects() ?: emptyList()
-    val audioEnd = assets.filter { it.optString("kind") == "audio" }.maxOfOrNull { it.optLong("offset_ms") + it.optLong("duration_ms") } ?: 0L
+    val audioEnd = maxOf(assets.filter { it.optString("kind") == "audio" }.maxOfOrNull { it.optLong("offset_ms") + it.optLong("duration_ms") } ?: 0L, pending.maxOfOrNull { it.second.optLong("offset") + it.second.optLong("duration") } ?: 0L)
     val disabled = busy || session?.optString("status") == "processing"
     suspend fun refresh() {
         courses = JSONArray(api.json("/v1/courses")).objects()
@@ -233,7 +233,7 @@ fun SevilApp() {
         }; dialog = ""
     } }) { Text(t("save")) } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text(t("cancel")) } })
     if(dialog == "camera") AlertDialog(onDismissRequest = { dialog = "" }, confirmButton = {}, text = { BoardCamera(t("capture"), t("close"), offset = { if(isRecording) recording.offset + SystemClock.elapsedRealtime() - recording.started else (photoOffset.toLongOrNull() ?: 0) * 1000 }, onPhoto = { file, offset -> work { upload(file, "photo", file.name, offset); file.delete() } }, onError = { error = it }, close = { dialog = "" }) })
-    if(dialog == "delete") AlertDialog(onDismissRequest = { dialog = "" }, text = { Text(t("deleteConfirm")) }, confirmButton = { TextButton(onClick = { work { api.json("/v1/sessions/${active!!.getString("id")}", "DELETE"); active = null; dialog = ""; refresh() } }) { Text(t("delete")) } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text(t("cancel")) } })
+    if(dialog == "delete") AlertDialog(onDismissRequest = { dialog = "" }, text = { Text(t("deleteConfirm")) }, confirmButton = { TextButton(onClick = { work { api.json("/v1/sessions/${active!!.getString("id")}", "DELETE"); pending.forEach { (file, _) -> file.delete(); File(file.path + ".json").delete() }; pending = emptyList(); active = null; dialog = ""; refresh() } }) { Text(t("delete")) } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text(t("cancel")) } })
 }
 
 @Composable

@@ -2,6 +2,7 @@ import asyncio
 import os
 import secrets
 import uuid
+import hashlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -125,11 +126,13 @@ async def upload(id: str, kind: Literal["audio", "photo", "resource"] = Form(...
     path = store.DATA / "files" / asset_id
     path.parent.mkdir(parents=True, exist_ok=True)
     size = 0
+    digest = hashlib.sha256()
     try:
         with path.open("wb") as destination:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
                 if size > limit: raise HTTPException(413, "File exceeds the upload limit")
+                digest.update(chunk)
                 destination.write(chunk)
         if not size: raise HTTPException(422, "The file is empty")
         mime = {".m4a": "audio/mp4", ".mp4": "audio/mp4", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".webm": "audio/webm", ".ogg": "audio/ogg", ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/plain"}.get(ext, "image/jpeg")
@@ -152,7 +155,11 @@ async def upload(id: str, kind: Literal["audio", "photo", "resource"] = Form(...
     except Exception:
         path.unlink(missing_ok=True)
         raise
-    asset = store.save("asset", {"id": asset_id, "session_id": id, "course_id": session["course_id"], "kind": kind, "name": name, "mime": mime, "size": path.stat().st_size, "offset_ms": offset_ms, "duration_ms": duration_ms})
+    for previous in store.all_records("asset"):
+        if previous.get("session_id") == id and previous["kind"] == kind and previous.get("offset_ms") == offset_ms and previous.get("sha256") == digest.hexdigest():
+            path.unlink(missing_ok=True)
+            return previous
+    asset = store.save("asset", {"id": asset_id, "session_id": id, "course_id": session["course_id"], "kind": kind, "name": name, "mime": mime, "size": path.stat().st_size, "offset_ms": offset_ms, "duration_ms": duration_ms, "sha256": digest.hexdigest()})
     # New course resources invalidate all completed sessions that used this course library.
     for target in store.all_records("session") if kind == "resource" else [session]:
         if target["course_id"] == session["course_id"] and target["status"] != "processing": invalidate(target)

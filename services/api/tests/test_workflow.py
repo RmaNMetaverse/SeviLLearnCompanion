@@ -91,6 +91,18 @@ def test_access_token_guards_all_private_endpoints(client, monkeypatch):
     assert client.post("/v1/sessions",json={"course_id":c["id"],"title":"Test","recording_permission":True}).status_code == 401
     assert client.get("/v1/courses",headers={"Authorization":"Bearer private-test-token"}).status_code == 200
 
+def test_retried_upload_is_idempotent(client):
+    s = session(client)
+    path = f"/v1/sessions/{s['id']}/assets"
+    first = client.post(path,data={"kind":"audio","offset_ms":1200,"duration_ms":4000},files={"file":("lecture.m4a",b"synthetic-test-audio")})
+    second = client.post(path,data={"kind":"audio","offset_ms":1200,"duration_ms":4000},files={"file":("lecture.m4a",b"synthetic-test-audio")})
+    assert first.status_code == second.status_code == 201
+    assert first.json()["id"] == second.json()["id"]
+    assert len(client.get(f"/v1/sessions/{s['id']}").json()["assets"]) == 1
+
+def test_cross_origin_requests_are_rejected(client):
+    assert client.get("/v1/courses",headers={"Origin":"https://untrusted.example"}).status_code == 403
+
 def test_live_mode_does_not_fall_back_to_fake_notes(client, monkeypatch):
     s = session(client)
     monkeypatch.setenv("SEVIL_MODE","live")
