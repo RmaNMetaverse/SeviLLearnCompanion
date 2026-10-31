@@ -33,7 +33,7 @@
     ],
     "uncertainties": [
       "This is synthetic sample content, not a summary of your session.",
-      "Live processing requires the selected provider key on the server and SEVIL_MODE=live."
+      "Live processing needs your selected provider key in Settings on this device and an internet connection."
     ]
   },
   "models": {

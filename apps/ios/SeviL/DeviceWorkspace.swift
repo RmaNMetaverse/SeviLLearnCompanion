@@ -14,7 +14,7 @@ actor DeviceWorkspace {
     private func editable(_ session: [String:Any]) throws { guard text(session,"status") != "processing" else { throw APIError.message("Wait for processing to finish") } }
     private func encoded(_ value: Any) throws -> Data { try JSONSerialization.data(withJSONObject:value,options:[.sortedKeys]) }
     func route(_ path: String,method: String,json: [String:Any]?) async throws -> Data {
-        let u=URLComponents(string:"https://device.invalid"+path)!,parts=u.path!.split(separator:"/").map(String.init)
+        let u=URLComponents(string:"https://device.invalid"+path)!,parts=u.path.split(separator:"/").map(String.init)
         var value=json ?? [:]
         if path=="/health" { return try encoded(["mode":"live","ai_configured":["gemini","openai","claude"].contains { !Keychain.read($0).isEmpty }]) }
         if path=="/v1/providers" { return try encoded(["default_provider":"gemini","providers":["openai","gemini","claude"].map { p -> [String:Any] in ["id":p,"label":["openai":"OpenAI","gemini":"Gemini","claude":"Claude"][p]!,"configured":!Keychain.read(p).isEmpty,"audio_supported":p != "claude","model":ai.model(p)] }]) }
