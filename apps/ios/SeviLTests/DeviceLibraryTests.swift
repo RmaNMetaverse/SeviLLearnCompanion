@@ -1,5 +1,6 @@
 import XCTest
 import PDFKit
+import UIKit
 @testable import SeviL
 
 final class DeviceLibraryTests: XCTestCase {
@@ -18,9 +19,16 @@ final class DeviceLibraryTests: XCTestCase {
         XCTAssertEqual(String(data:bytes,encoding:.utf8),"Synthetic textbook extract")
         let reopened=try DeviceStore()
         XCTAssertEqual(try reopened.get("session",session.id)["title"] as? String,"Offline lecture")
+        let board=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString+".png")
+        let image=UIGraphicsImageRenderer(size:CGSize(width:80,height:60)).image { context in UIColor.green.setFill();context.fill(CGRect(x:0,y:0,width:80,height:60)) }
+        try XCTUnwrap(image.pngData()).write(to:board)
+        defer { try? FileManager.default.removeItem(at:board) }
+        try await api.upload(session:session.id,file:board,name:"board.png",kind:"photo",offset:12500)
         let _: LectureSession=try await api.get("/v1/sessions/"+session.id+"/demo",method:"POST",json:[:])
         let pdf=try await api.data("/v1/sessions/"+session.id+"/handout.pdf")
-        XCTAssertGreaterThan(try XCTUnwrap(PDFDocument(data:pdf)).pageCount,0)
+        let document=try XCTUnwrap(PDFDocument(data:pdf))
+        XCTAssertGreaterThanOrEqual(document.pageCount,2)
+        XCTAssertTrue(document.string?.contains("captured at 12s")==true)
         try Keychain.save("",account:"gemini")
         do {
             let _: LectureSession=try await api.get("/v1/sessions/"+session.id+"/generate",method:"POST",json:["provider":"gemini"])

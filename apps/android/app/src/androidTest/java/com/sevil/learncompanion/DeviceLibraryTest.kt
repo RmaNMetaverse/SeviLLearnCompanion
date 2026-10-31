@@ -10,6 +10,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import android.graphics.Bitmap
 
 @RunWith(AndroidJUnit4::class)
 class DeviceLibraryTest {
@@ -26,15 +27,22 @@ class DeviceLibraryTest {
         assertEquals(resource.readText(),api.assetFile(saved.getString("id")).readText())
         val reopened=DeviceStore(context)
         assertEquals("Offline lecture",reopened.get("session",id).getString("title"));reopened.close()
+        val board=File(context.cacheDir,"synthetic-board.png")
+        val bitmap=Bitmap.createBitmap(80,60,Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.GREEN) }
+        board.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) };bitmap.recycle()
+        api.upload(id,board,"board.png","photo",12500,0)
+        val photo=JSONObject(api.json("/v1/sessions/$id")).getJSONArray("assets").objects().first { it.getString("kind")=="photo" }
+        assertEquals(12500,photo.getInt("offset_ms"))
         api.json("/v1/sessions/$id/demo","POST",JSONObject())
         val pdfFile=File(context.cacheDir,"synthetic.pdf").apply { writeBytes(api.bytes("/v1/sessions/$id/handout.pdf")) }
-        PdfRenderer(ParcelFileDescriptor.open(pdfFile,ParcelFileDescriptor.MODE_READ_ONLY)).use { assertTrue(it.pageCount>0) }
+        PdfRenderer(ParcelFileDescriptor.open(pdfFile,ParcelFileDescriptor.MODE_READ_ONLY)).use { assertTrue(it.pageCount>=2) }
         api.keys.save("gemini","")
         try { api.json("/v1/sessions/$id/generate","POST",JSONObject().put("provider","gemini"));fail("Missing key should fail before network") } catch(e:IllegalArgumentException) { assertTrue(e.message!!.contains("Settings")) }
         api.json("/v1/sessions/$id","DELETE")
+        assertFalse(api.assetFile(photo.getString("id")).exists())
         assertTrue(api.assetFile(saved.getString("id")).exists()) // Course resource survives session deletion.
         api.json("/v1/assets/${saved.getString("id")}","DELETE")
-        resource.delete();pdfFile.delete()
+        resource.delete();pdfFile.delete();board.delete()
     }
     @Test fun deviceKeysAreEncryptedAndCanBeCleared() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
