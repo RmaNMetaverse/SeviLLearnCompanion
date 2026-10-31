@@ -10,8 +10,13 @@ struct LanguagePicker: View {
 struct CourseForm: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
-    @State private var title = "", university = "", degree = "", professor = "", code = ""
-    @State private var lecture = "en", output = "en"
+    @State private var title = ""
+    @State private var university = ""
+    @State private var degree = ""
+    @State private var professor = ""
+    @State private var code = ""
+    @State private var lecture = "en"
+    @State private var output = "en"
     var body: some View {
         NavigationStack { Form {
             TextField(model.t("title"),text:$title); TextField(model.t("university"),text:$university); TextField(model.t("degree"),text:$degree); TextField(model.t("professor"),text:$professor); TextField(model.t("code"),text:$code)
@@ -26,7 +31,8 @@ struct CourseForm: View {
 struct SessionForm: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.dismiss) var dismiss
-    @State private var title = "", course = ""
+    @State private var title = ""
+    @State private var course = ""
     @State private var permission = false
     var body: some View {
         NavigationStack { Form {

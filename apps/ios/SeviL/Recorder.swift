@@ -11,7 +11,7 @@ struct PendingRecording: Codable, Identifiable {
 }
 
 @MainActor final class Recorder: NSObject, ObservableObject, AVAudioRecorderDelegate {
-    static var folder: URL {
+    nonisolated static var folder: URL {
         let path = FileManager.default.urls(for:.applicationSupportDirectory, in:.userDomainMask)[0].appendingPathComponent("Recordings", isDirectory:true)
         try? FileManager.default.createDirectory(at:path, withIntermediateDirectories:true)
         return path
