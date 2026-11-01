@@ -46,7 +46,7 @@ struct SessionChatView: View {
             Text(model.t("chatIntro")).font(.subheadline).foregroundStyle(Design.muted).multilineTextAlignment(.center)
             LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:10) {ForEach(["explainSimply","giveExample","quizMe","findResources"],id:\.self) {key in
                 Button {draft=model.t(key);request=nil;if key=="findResources" {search=true}} label:{HStack(spacing:7) {Image(systemName:"sparkles").font(.caption);Text(model.t(key)).font(.caption.weight(.medium));Spacer(minLength:0)}.padding(12).frame(maxWidth:.infinity,minHeight:50).background(Design.background,in:RoundedRectangle(cornerRadius:13)).overlay {RoundedRectangle(cornerRadius:13).stroke(Design.line,lineWidth:1)}}.buttonStyle(.plain).disabled(disabled)
-            }.padding(.top,12)
+            }}.padding(.top,12)
         }.padding(.vertical,24).frame(maxWidth:.infinity)
     }
     func bubble(_ message: ChatMessage) -> some View {

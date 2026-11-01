@@ -49,7 +49,9 @@ async function all(kind: string): Promise<Item[]> {
     .filter((r: Item) => r.kind === kind)
     .map((r: Item) => r.value)
     .sort((a: Item, b: Item) =>
-      String(b.created_at).localeCompare(String(a.created_at)),
+      kind === "message" && a.sequence && b.sequence
+        ? b.sequence - a.sequence
+        : String(b.created_at).localeCompare(String(a.created_at)),
     );
 }
 async function get(kind: string, id: string): Promise<Item> {
@@ -748,7 +750,12 @@ async function sendChat(session: Item, body: Item) {
     throw Error(
       "Add a transcript or session materials before asking the tutor.",
     );
-  const history = (await all("message"))
+  const sessionMessages = (await all("message")).filter(
+    (m) => m.session_id === session.id,
+  );
+  const sequence =
+    Math.max(0, ...sessionMessages.map((m) => Number(m.sequence || 0))) + 1;
+  const history = sessionMessages
     .filter((m) => m.session_id === session.id && m.status === "complete")
     .reverse()
     .slice(-limits.history_messages)
@@ -761,6 +768,7 @@ async function sendChat(session: Item, body: Item) {
     id: prefix + ":user",
     session_id: session.id,
     role: "user",
+    sequence,
     content: question,
     provider,
     status: "pending",
@@ -850,6 +858,7 @@ async function sendChat(session: Item, body: Item) {
       id: prefix + ":assistant",
       session_id: session.id,
       role: "assistant",
+      sequence: sequence + 1,
       content: reply.answer,
       provider,
       model: contract.models[provider],
