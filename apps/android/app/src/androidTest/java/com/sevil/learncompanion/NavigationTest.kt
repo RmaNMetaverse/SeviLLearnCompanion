@@ -6,12 +6,17 @@ import android.graphics.Bitmap
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import androidx.test.platform.app.InstrumentationRegistry
+import android.os.ParcelFileDescriptor
 
 class NavigationTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private fun screenshot(name: String) {
         val file=File(compose.activity.getExternalFilesDir(null),name)
         file.outputStream().use {compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
+        // Gradle removes the test app after connected tests, so retain previews outside its directory.
+        val command="mkdir -p /sdcard/Download/sevil-ui && cp '${file.absolutePath}' '/sdcard/Download/sevil-ui/$name'"
+        ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).use {it.readBytes()}
     }
     @Test fun phoneNavigationAndClassroomChatAreReachable() {
         compose.waitForIdle();screenshot("ui-home.png")
