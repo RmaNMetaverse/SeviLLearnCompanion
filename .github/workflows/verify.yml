@@ -74,10 +74,21 @@ jobs:
             mkdir -p "$HOME/.android"
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
             chmod 600 "$HOME/.android/debug.keystore"
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            echo '::error::Stable Android test signing key is missing; refusing a release with a new certificate.'
+            exit 1
           fi
       - run: apps/android/gradlew -p apps/android assembleDebug --console=plain
         env:
           SEVIL_BUILD_NUMBER: ${{ github.run_number }}
+      - name: Verify stable Android update certificate
+        if: github.event_name == 'push'
+        run: |
+          ACTUAL=$($ANDROID_HOME/build-tools/35.0.0/apksigner verify --print-certs apps/android/app/build/outputs/apk/debug/app-debug.apk | awk '/Signer #1 certificate SHA-256 digest:/ {print $NF; exit}')
+          if [ "$ACTUAL" != '1e8ed0fdf0dd1758f8a7b197ad9ac61ec41b8be8d00b671ff6b74c7d71a774ab' ]; then
+            echo '::error::Android test certificate changed; refusing a release that would require uninstalling the app.'
+            exit 1
+          fi
       - name: Prepare Android download
         run: |
           mkdir -p release

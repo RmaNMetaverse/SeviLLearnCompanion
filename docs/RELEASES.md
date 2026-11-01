@@ -16,6 +16,8 @@ Store a Base64-encoded debug keystore as the repository Actions secret `ANDROID_
 
 This repository now has that secret configured from the development laptop's existing debug keystore with the owner's explicit approval. Subsequent workflow runs use the same test signing identity. Older builds published before this setup can still have a different signature.
 
+The release workflow now verifies the expected test certificate before publishing and fails if the signing secret is missing. Builds 11, 16 and 17 were found to have three different test certificates, so those APKs cannot update one another in place. The corrected test identity matches the development laptop's debug keystore; compare certificates with `apksigner verify --print-certs <apk>` before installing over an existing app. If they differ, keep the old app installed until its local library is backed up or migrated. Recording files and database entries can be lost on uninstall; API keys must be entered again after any reinstall.
+
 Without the secret, GitHub runners generate different test certificates. Android then rejects an update over the previous build; uninstalling deletes that installation's local library. Export important files first. The local laptop's debug keystore is separate unless the same keystore is configured for GitHub. The build manifest identifies source and build number, not signing continuity.
 
 ## iOS simulator
