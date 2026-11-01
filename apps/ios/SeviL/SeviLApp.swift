@@ -182,8 +182,8 @@ struct SessionView: View {
         VStack(alignment:.leading,spacing:18) {
             HStack { Image(systemName:"mic.fill").font(.title3).foregroundStyle(recorder.recording ? Design.danger:Design.primary).frame(width:50,height:50).background(Design.mint,in:RoundedRectangle(cornerRadius:16)); Text(clock(recorder.recording ? recorder.elapsed : audioEnd)).font(.system(size:28,weight:.bold).monospacedDigit()); Spacer(); if recorder.recording { Circle().fill(.red).frame(width:9,height:9) } }
             HStack {
-                Button(model.t(recorder.recording ? "stop" : "record")) { if recorder.recording { recorder.stop() } else { model.run { try await recorder.start(session:session.id,offset:audioEnd) } } }.buttonStyle(.borderedProminent).disabled(disabled && !recorder.recording)
-                Button { camera = true } label: { Label(model.t("photo"),systemImage:"camera") }.buttonStyle(.bordered).disabled(disabled)
+                Button(model.t(recorder.recording ? "stop" : "record")) { if recorder.recording { recorder.stop() } else { model.run { try await recorder.start(session:session.id,offset:audioEnd) } } }.buttonStyle(.borderedProminent).controlSize(.large).frame(minHeight:48).disabled(disabled && !recorder.recording)
+                Button { camera = true } label: { Label(model.t("photo"),systemImage:"camera") }.buttonStyle(.bordered).controlSize(.large).frame(minHeight:48).disabled(disabled)
             }
         }.card()
     }

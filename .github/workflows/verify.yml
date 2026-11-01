@@ -112,16 +112,13 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            apps/android/gradlew -p apps/android connectedDebugAndroidTest --console=plain
-            mkdir -p artifacts/android-ui
-            adb pull /sdcard/Android/data/com.sevil.learncompanion/files/ui-home.png artifacts/android-ui/home.png
-            adb pull /sdcard/Android/data/com.sevil.learncompanion/files/ui-chat.png artifacts/android-ui/chat.png
+          script: bash scripts/check-android-emulator.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Android-UI-previews
           path: artifacts/android-ui
-          if-no-files-found: error
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

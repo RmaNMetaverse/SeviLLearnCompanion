@@ -891,7 +891,8 @@ main {
   scrollbar-width: none;
 }
 .tabs button {
-  flex: 1;
+  flex: 1 0 auto;
+  min-width: max-content;
   white-space: nowrap;
   min-height: 52px;
   padding: 10px 14px;
@@ -1326,7 +1327,7 @@ footer span {
 .chat-panel {
   display: flex;
   flex-direction: column;
-  height: 640px;
+  height: clamp(420px, calc(100dvh - 240px), 720px);
   max-height: 85dvh;
   min-height: 440px;
 }
@@ -1895,7 +1896,7 @@ footer span {
     padding: 20px 16px;
   }
   .chat-panel {
-    height: 620px;
+    height: clamp(420px, calc(100dvh - 240px), 720px);
     max-height: none;
     min-height: 440px;
   }

@@ -35,7 +35,7 @@ struct SessionChatView: View {
             if !error.isEmpty {Text(error).font(.caption).foregroundStyle(Design.danger).padding(12).frame(maxWidth:.infinity,alignment:.leading).background(Color.red.opacity(0.05))}
             Divider().overlay(Design.line)
             composer
-        }.frame(height:640).background(.white,in:RoundedRectangle(cornerRadius:20)).overlay {RoundedRectangle(cornerRadius:20).stroke(Design.line,lineWidth:1)}.clipShape(RoundedRectangle(cornerRadius:20))
+        }.frame(height:min(720,max(420,UIScreen.main.bounds.height-240))).background(.white,in:RoundedRectangle(cornerRadius:20)).overlay {RoundedRectangle(cornerRadius:20).stroke(Design.line,lineWidth:1)}.clipShape(RoundedRectangle(cornerRadius:20))
         .task(id:id) {do {messages=try await model.api.get("/v1/sessions/"+id+"/chat")} catch {self.error=error.localizedDescription}}
         .confirmationDialog(model.t("clearChatConfirm"),isPresented:$clear,titleVisibility:.visible) {Button(model.t("clearChat"),role:.destructive) {Task {do {_=try await model.api.data("/v1/sessions/"+id+"/chat",method:"DELETE");messages=[];error="";request=nil} catch {self.error=error.localizedDescription}}}}
     }

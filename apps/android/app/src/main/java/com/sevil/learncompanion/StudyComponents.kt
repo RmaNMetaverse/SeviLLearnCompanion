@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
@@ -61,7 +63,8 @@ import java.util.UUID
     }
     LaunchedEffect(id) {runCatching {load()}.onFailure {error=it.message ?: t("error")}}
     LaunchedEffect(messages.size,sending) {if(messages.isNotEmpty() || sending)scroll.animateScrollTo(scroll.maxValue)}
-    Surface(color=Color.White,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,Design.line)) {Column(Modifier.fillMaxWidth().height(640.dp)) {
+    val panelHeight=(LocalConfiguration.current.screenHeightDp-240).coerceIn(420,720).dp
+    Surface(modifier=Modifier.testTag("session-tutor-panel"),color=Color.White,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,Design.line)) {Column(Modifier.fillMaxWidth().height(panelHeight)) {
         Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {Box(Modifier.size(42.dp).background(Design.mint,RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {Icon(Icons.Outlined.AutoAwesome,null,tint=Design.primary)};Column(Modifier.weight(1f)) {Text(t("sessionTutor"),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold);Text(t("chatNotice"),style=MaterialTheme.typography.labelSmall,color=Design.muted)};IconButton(enabled=!sending&&!disabled&&messages.isNotEmpty(),onClick={clear=true}) {Icon(Icons.Outlined.DeleteOutline,t("clearChat"),modifier=Modifier.size(18.dp))}}
         HorizontalDivider(color=Design.line)
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(16.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {

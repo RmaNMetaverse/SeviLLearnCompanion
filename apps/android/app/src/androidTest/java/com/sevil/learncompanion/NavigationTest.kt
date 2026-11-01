@@ -23,6 +23,7 @@ class NavigationTest {
         compose.onNodeWithText("Try a sample lecture").performScrollTo().performClick()
         compose.waitUntil(15000) {compose.onAllNodesWithText("Chat").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithText("Chat").performScrollTo().performClick()
+        compose.onNodeWithTag("session-tutor-panel").performScrollTo()
         compose.onNodeWithText("Ask your lecture").performScrollTo()
         screenshot("ui-chat.png")
         compose.onNodeWithText("Ask your lecture").assertIsDisplayed()
