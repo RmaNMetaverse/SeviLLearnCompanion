@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 
 @MainActor final class AppModel: ObservableObject {
+    @Published var selectedCourseId=""
+    @Published var sessionLinks=[SessionLink]()
     @Published var courses: [Course] = []
     @Published var sessions: [LectureSession] = []
     @Published var active: LectureSession?
@@ -35,6 +37,7 @@ import SwiftUI
     }
     func open(_ id: String) async throws {
         active = try await api.get("/v1/sessions/\(id)")
+        sessionLinks=try await api.get("/v1/sessions/\(id)/links")
         try await refreshSources()
     }
     func refreshSources() async throws {

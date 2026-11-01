@@ -18,9 +18,9 @@ struct DeviceAI {
     }
     func validate(_ provider: String,_ response: URLResponse) throws { guard let r=response as? HTTPURLResponse,(200..<300).contains(r.statusCode) else { throw APIError.message("\(provider) returned HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0). Check your device key, internet connection and quota. No other service was used.") } }
     func part(_ file: URL,_ mime: String) throws -> [String:Any] { ["inlineData":["mimeType":mime,"data":try Data(contentsOf:file).base64EncodedString()]] }
-    func gemini(_ parts: [[String:Any]],instructions: String="",schema: Bool=false,search: Bool=false) async throws -> [String:Any] {
-        var config: [String:Any]=["maxOutputTokens":65536]
-        if schema { config["responseMimeType"]="application/json";config["responseJsonSchema"]=contract["schema"] }
+    func gemini(_ parts: [[String:Any]],instructions: String="",schema: Bool=false,search: Bool=false,responseSchema: [String:Any]?=nil,maxTokens: Int=65536) async throws -> [String:Any] {
+        var config: [String:Any]=["maxOutputTokens":maxTokens]
+        if schema { config["responseMimeType"]="application/json";config["responseJsonSchema"]=responseSchema ?? (contract["schema"] as! [String:Any]) }
         var body: [String:Any]=["contents":[["role":"user","parts":parts]],"generationConfig":config]
         if !instructions.isEmpty { body["systemInstruction"]=["parts":[["text":instructions]]] }
         if search { body["tools"]=[["google_search":[:]]] }
@@ -63,12 +63,14 @@ struct DeviceAI {
         let (result,response)=try await URLSession.shared.data(for:req);try validate(provider,response)
         return (try JSONSerialization.jsonObject(with:result) as? [String:Any])?["text"] as? String ?? ""
     }
-    func note(_ provider: String,evidence: [String:Any],attachments: [(URL,String)]) async throws -> [String:Any] {
+    func note(_ provider: String,evidence: [String:Any],attachments: [(URL,String)],chat: Bool=false) async throws -> [String:Any] {
+        let instructions=contract[chat ? "chat_prompt":"notes_prompt"] as! String
+        let schema=contract[chat ? "chat_schema":"schema"] as! [String:Any]
         let text=String(data:try JSONSerialization.data(withJSONObject:evidence),encoding:.utf8)!
         var parts: [[String:Any]]=[["text":text]]
         for (url,mime) in attachments { parts.append(try part(url,mime)) }
         let output: String
-        if provider=="gemini" { output=try geminiText(await gemini(parts,instructions:contract["notes_prompt"] as! String,schema:true)) }
+        if provider=="gemini" { output=try geminiText(await gemini(parts,instructions:instructions,schema:true,responseSchema:schema,maxTokens:chat ? 8192:65536)) }
         else {
             let content: [[String:Any]]=parts.map { part in
                 if let text=part["text"] as? String { return ["type":provider=="openai" ? "input_text":"text","text":text] }
@@ -77,10 +79,10 @@ struct DeviceAI {
                 return ["type":mime=="application/pdf" ? "document":"image","source":["type":"base64","media_type":mime,"data":data]]
             }
             if provider=="openai" {
-                let result=try await request(provider,"responses",["model":model(provider),"store":false,"instructions":contract["notes_prompt"]!,"input":[["role":"user","content":content]],"text":["format":["type":"json_schema","name":"lecture_handout","strict":true,"schema":contract["schema"]!]]])
+                let result=try await request(provider,"responses",["model":model(provider),"store":false,"instructions":instructions,"input":[["role":"user","content":content]],"text":["format":["type":"json_schema","name":"lecture_handout","strict":true,"schema":schema]]])
                 output=(result["output"] as? [[String:Any]] ?? []).flatMap { $0["content"] as? [[String:Any]] ?? [] }.filter { $0["type"] as? String=="output_text" }.compactMap { $0["text"] as? String }.joined()
             } else {
-                let result=try await request(provider,"messages",["model":model(provider),"max_tokens":16384,"system":contract["notes_prompt"]!,"messages":[["role":"user","content":content]],"output_config":["format":["type":"json_schema","schema":contract["schema"]!]]])
+                let result=try await request(provider,"messages",["model":model(provider),"max_tokens":chat ? 4096:16384,"system":instructions,"messages":[["role":"user","content":content]],"output_config":["format":["type":"json_schema","schema":schema]]])
                 guard result["stop_reason"] as? String=="end_turn" else { throw APIError.message("Claude response incomplete") }
                 output=(result["content"] as? [[String:Any]] ?? []).filter { $0["type"] as? String=="text" }.compactMap { $0["text"] as? String }.joined()
             }

@@ -1,0 +1,10 @@
+{
+  "colors": {"primary":"#246D5E","forest":"#164C40","ink":"#203D35","muted":"#61766B","background":"#F7F8F4","surface":"#FFFFFF","mint":"#E8F2EB","line":"#DCE7DE","accent":"#D5E7C8","danger":"#A63E3E"},
+  "compactBelow":600,
+  "expandedFrom":1024,
+  "spacing":20,
+  "radius":20,
+  "touchTarget":48,
+  "navigation":["overview","courses","sessions","settings"],
+  "sessionTabs":["notes","chat","transcript","materials"]
+}

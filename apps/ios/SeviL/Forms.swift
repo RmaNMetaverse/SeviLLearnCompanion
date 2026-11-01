@@ -43,7 +43,7 @@ struct SessionForm: View {
         }.navigationTitle(model.t("newSession")).toolbar {
             ToolbarItem(placement:.cancellationAction) { Button(model.t("cancel")) { dismiss() } }
             ToolbarItem(placement:.confirmationAction) { Button(model.t("save")) { model.run { try await model.createSession(course:course,title:title,permission:permission); dismiss() } }.disabled(model.busy || title.trimmingCharacters(in:.whitespaces).isEmpty || course.isEmpty || !permission) }
-        }.onAppear { course = model.courses.first?.id ?? "" } }
+        }.onAppear { course = model.selectedCourseId.isEmpty ? model.courses.first?.id ?? "" : model.selectedCourseId } }
     }
 }
 struct SettingsView: View {
@@ -54,6 +54,7 @@ struct SettingsView: View {
     @State private var claudeKey = Keychain.read("claude")
     var body: some View {
         NavigationStack { Form {
+            ProviderControls()
             LanguagePicker(label:model.t("language"),selection:$model.locale)
             Text(model.t("deviceStorageNotice")).font(.caption)
             SecureField("Gemini " + model.t("apiKey"),text:$geminiKey).textInputAutocapitalization(.never).autocorrectionDisabled()

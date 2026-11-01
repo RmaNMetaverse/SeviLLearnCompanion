@@ -19,6 +19,7 @@ jobs:
           cache-dependency-path: services/api/requirements.txt
       - run: pip install -r services/api/requirements.txt
       - run: python scripts/sync-locales.py --check
+      - run: python scripts/sync-design.py --check
       - run: python scripts/sync-ai-contract.py --check
       - run: python scripts/export-contract.py --check
       - run: python -m pytest services/api/tests scripts/tests -q
@@ -111,7 +112,16 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: apps/android/gradlew -p apps/android connectedDebugAndroidTest --console=plain
+          script: |
+            apps/android/gradlew -p apps/android connectedDebugAndroidTest --console=plain
+            mkdir -p artifacts/android-ui
+            adb pull /sdcard/Android/data/com.sevil.learncompanion/files/ui-home.png artifacts/android-ui/home.png
+            adb pull /sdcard/Android/data/com.sevil.learncompanion/files/ui-chat.png artifacts/android-ui/chat.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-UI-previews
+          path: artifacts/android-ui
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

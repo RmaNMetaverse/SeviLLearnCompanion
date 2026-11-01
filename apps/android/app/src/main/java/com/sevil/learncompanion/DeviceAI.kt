@@ -26,9 +26,9 @@ class DeviceAI(context: Context,val keys: DeviceKeys) {
         }
     }
     private fun part(file: File,mime: String): JSONObject = JSONObject().put("inlineData",JSONObject().put("mimeType",mime).put("data",Base64.encodeToString(file.readBytes(),Base64.NO_WRAP)))
-    fun gemini(parts: JSONArray,instructions: String="",schema: Boolean=false,search: Boolean=false): JSONObject {
-        val config=JSONObject().put("maxOutputTokens",65536)
-        if(schema) config.put("responseMimeType","application/json").put("responseJsonSchema",contract.getJSONObject("schema"))
+    fun gemini(parts: JSONArray,instructions: String="",schema: Boolean=false,search: Boolean=false,responseSchema: JSONObject=contract.getJSONObject("schema"),maxTokens: Int=65536): JSONObject {
+        val config=JSONObject().put("maxOutputTokens",maxTokens)
+        if(schema) config.put("responseMimeType","application/json").put("responseJsonSchema",responseSchema)
         val body=JSONObject().put("contents",JSONArray().put(JSONObject().put("role","user").put("parts",parts))).put("generationConfig",config)
         if(instructions.isNotEmpty()) body.put("systemInstruction",JSONObject().put("parts",JSONArray().put(JSONObject().put("text",instructions))))
         if(search) body.put("tools",JSONArray().put(JSONObject().put("google_search",JSONObject())))
@@ -64,18 +64,20 @@ class DeviceAI(context: Context,val keys: DeviceKeys) {
         val body=MultipartBody.Builder().setType(MultipartBody.FORM).addFormDataPart("model","gpt-transcribe").addFormDataPart("prompt",prompt).addFormDataPart("file",file.name,file.asRequestBody(mime.toMediaType())).build()
         client.newCall(Request.Builder().url("https://api.openai.com/v1/audio/transcriptions").header("Authorization","Bearer $key").post(body).build()).execute().use { r -> require(r.isSuccessful) { "OpenAI transcription failed (${r.code})." }; return JSONObject(r.body!!.string()).getString("text") }
     }
-    fun note(provider: String,evidence: JSONObject,attachments: List<Pair<File,String>>): JSONObject {
+    fun note(provider: String,evidence: JSONObject,attachments: List<Pair<File,String>>,chat: Boolean=false): JSONObject {
+        val schema=contract.getJSONObject(if(chat) "chat_schema" else "schema")
+        val instructions=contract.getString(if(chat) "chat_prompt" else "notes_prompt")
         val parts=JSONArray().put(JSONObject().put("text",evidence.toString()))
         attachments.forEach { (file,mime) -> require(file.length()<=20*1024*1024) { "Use attachments under 20 MiB." }; parts.put(part(file,mime)) }
-        if(provider=="gemini") return JSONObject(geminiText(gemini(parts,contract.getString("notes_prompt"),schema=true)))
+        if(provider=="gemini") return JSONObject(geminiText(gemini(parts,instructions,schema=true,responseSchema=schema,maxTokens=if(chat) 8192 else 65536)))
         val content=JSONArray()
         parts.objects().forEach { p -> if(p.has("text")) content.put(JSONObject().put("type",if(provider=="openai") "input_text" else "text").put("text",p.getString("text"))) else {
             val inline=p.getJSONObject("inlineData"); val mime=inline.getString("mimeType"); val data=inline.getString("data")
             if(provider=="openai") content.put(if(mime=="application/pdf") JSONObject().put("type","input_file").put("filename","course.pdf").put("file_data","data:$mime;base64,$data") else JSONObject().put("type","input_image").put("image_url","data:$mime;base64,$data"))
             else content.put(JSONObject().put("type",if(mime=="application/pdf") "document" else "image").put("source",JSONObject().put("type","base64").put("media_type",mime).put("data",data)))
         } }
-        if(provider=="openai") { val body=JSONObject().put("model",contract.getJSONObject("models").getString(provider)).put("store",false).put("instructions",contract.getString("notes_prompt")).put("input",JSONArray().put(JSONObject().put("role","user").put("content",content))).put("text",JSONObject().put("format",JSONObject().put("type","json_schema").put("name","lecture_handout").put("strict",true).put("schema",contract.getJSONObject("schema")))); val r=request(provider,"responses",body); return JSONObject(r.getJSONArray("output").objects().flatMap { it.optJSONArray("content")?.objects() ?: emptyList() }.filter { it.optString("type")=="output_text" }.joinToString("") { it.getString("text") }) }
-        val r=request(provider,"messages",JSONObject().put("model",contract.getJSONObject("models").getString(provider)).put("max_tokens",16384).put("system",contract.getString("notes_prompt")).put("messages",JSONArray().put(JSONObject().put("role","user").put("content",content))).put("output_config",JSONObject().put("format",JSONObject().put("type","json_schema").put("schema",contract.getJSONObject("schema")))))
+        if(provider=="openai") { val body=JSONObject().put("model",contract.getJSONObject("models").getString(provider)).put("store",false).put("instructions",instructions).put("input",JSONArray().put(JSONObject().put("role","user").put("content",content))).put("text",JSONObject().put("format",JSONObject().put("type","json_schema").put("name","lecture_handout").put("strict",true).put("schema",schema))); val r=request(provider,"responses",body); return JSONObject(r.getJSONArray("output").objects().flatMap { it.optJSONArray("content")?.objects() ?: emptyList() }.filter { it.optString("type")=="output_text" }.joinToString("") { it.getString("text") }) }
+        val r=request(provider,"messages",JSONObject().put("model",contract.getJSONObject("models").getString(provider)).put("max_tokens",if(chat) 4096 else 16384).put("system",instructions).put("messages",JSONArray().put(JSONObject().put("role","user").put("content",content))).put("output_config",JSONObject().put("format",JSONObject().put("type","json_schema").put("schema",schema))))
         require(r.optString("stop_reason")=="end_turn") { "Claude response incomplete." }; return JSONObject(r.getJSONArray("content").objects().filter { it.optString("type")=="text" }.joinToString("") { it.getString("text") })
     }
 }

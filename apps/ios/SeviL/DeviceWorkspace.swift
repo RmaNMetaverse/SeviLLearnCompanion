@@ -5,19 +5,22 @@ import PDFKit
 actor DeviceWorkspace {
     static let shared=DeviceWorkspace()
     let store: DeviceStore
+    var chatPending=Set<String>()
     let ai: DeviceAI
     private init() {
         store=try! DeviceStore();ai=try! DeviceAI()
+        for var m in (try? store.all("message")) ?? [] where m["status"] as? String=="pending" {m["status"]="failed";m["error"]="Reply interrupted. Retry your question.";try? store.save("message",m)}
         for var s in (try? store.all("session")) ?? [] where s["status"] as? String=="processing" { s["status"]="failed";s["error"]="Processing was interrupted. Files remain on this device; retry when ready.";try? store.save("session",s) }
     }
-    private func text(_ value: [String:Any],_ key: String,_ fallback: String="") -> String { value[key] as? String ?? fallback }
-    private func editable(_ session: [String:Any]) throws { guard text(session,"status") != "processing" else { throw APIError.message("Wait for processing to finish") } }
-    private func encoded(_ value: Any) throws -> Data { try JSONSerialization.data(withJSONObject:value,options:[.sortedKeys]) }
+    func text(_ value: [String:Any],_ key: String,_ fallback: String="") -> String { value[key] as? String ?? fallback }
+    func editable(_ session: [String:Any]) throws { guard !chatPending.contains(text(session,"id")) else { throw APIError.message("Wait for the session tutor to finish") }; guard text(session,"status") != "processing" else { throw APIError.message("Wait for processing to finish") } }
+    func encoded(_ value: Any) throws -> Data { try JSONSerialization.data(withJSONObject:value,options:[.sortedKeys]) }
     func route(_ path: String,method: String,json: [String:Any]?) async throws -> Data {
         let u=URLComponents(string:"https://device.invalid"+path)!,parts=u.path.split(separator:"/").map(String.init)
         var value=json ?? [:]
         if path=="/health" { return try encoded(["mode":"live","ai_configured":["gemini","openai","claude"].contains { !Keychain.read($0).isEmpty }]) }
         if path=="/v1/providers" { return try encoded(["default_provider":"gemini","providers":["openai","gemini","claude"].map { p -> [String:Any] in ["id":p,"label":["openai":"OpenAI","gemini":"Gemini","claude":"Claude"][p]!,"configured":!Keychain.read(p).isEmpty,"audio_supported":p != "claude","model":ai.model(p)] }]) }
+        if parts.count==3 && parts[1]=="links" && method=="DELETE" { let link=try store.get("link",parts[2]);let session=try store.get("session",text(link,"session_id"));try editable(session);try store.remove(parts[2]);try store.invalidate(session);return Data() }
         if parts.count>=2 && parts[1]=="courses" {
             if parts.count==2 {
                 if method=="GET" { return try encoded(store.all("course")) }
@@ -40,8 +43,10 @@ actor DeviceWorkspace {
                 return try encoded(store.save("session",value))
             }
             let id=parts[2];var s=try store.get("session",id)
+            if parts.count==4 && parts[3]=="chat" { if method=="GET" {return try encoded(chatMessages(id))};try editable(s);if method=="DELETE" {for m in try chatMessages(id) {try store.remove(text(m,"id"))};return Data()};return try encoded(await sendChat(s,value:value)) }
+            if parts.count==4 && parts[3]=="links" { if method=="GET" {return try encoded(sessionLinks(id))};try editable(s);return try encoded(addSessionLink(s,value:value)) }
             if parts.count==3 {
-                if method=="DELETE" { try editable(s);for a in try store.all("asset") where text(a,"session_id")==id && text(a,"kind") != "resource" { try? FileManager.default.removeItem(at:store.file(text(a,"id")));try store.remove(text(a,"id")) };try store.remove(id);return Data() }
+                if method=="DELETE" { try editable(s);for a in try store.all("asset") where text(a,"session_id")==id && text(a,"kind") != "resource" { try? FileManager.default.removeItem(at:store.file(text(a,"id")));try store.remove(text(a,"id")) };for m in try chatMessages(id)+sessionLinks(id) {try store.remove(text(m,"id"))};try store.remove(id);return Data() }
                 s["assets"]=try store.assets(s);return try encoded(s)
             }
             if parts[3]=="handout.pdf" { guard text(s,"status")=="ready" else { throw APIError.message("Generate a handout first") };return try DevicePDF.render(s,course:store.get("course",text(s,"course_id")),assets:store.assets(s),store:store) }
@@ -109,6 +114,7 @@ actor DeviceWorkspace {
                 else { total += a["size"] as? Int ?? 0;guard total<=30*1024*1024 else { throw APIError.message("Combined images/PDFs must be under 30 MiB") };attachments.append((file,text(a,"mime")));source["attachment_index"]=attachments.count-1 }
                 sources.append(source)
             }
+            for l in try sessionLinks(id) {sources.append(["id":"link:"+text(l,"id"),"label":text(l,"title")+" · "+text(l,"url"),"text":text(l,"text")])}
             let note=try await ai.note(provider,evidence:["course":course,"session_title":text(s,"title"),"transcript":text(s,"transcript"),"sources":sources],attachments:attachments)
             try validateNote(note,sources:sources)
             s.merge(["status":"ready","handout":note,"sources":sources,"generated_provider":provider,"generated_mode":"live","error":NSNull()]) { _,new in new };try store.save("session",s)
@@ -120,11 +126,11 @@ actor DeviceWorkspace {
         for section in note["sections"] as! [[String:Any]] {
             let kind=text(section,"kind"),citations=section["citations"] as! [String]
             guard ["lecture","supporting","explanation"].contains(kind),citations.allSatisfy({ids.contains($0)}),kind=="explanation" || !citations.isEmpty,kind != "lecture" || citations.contains(where:{$0.hasPrefix("audio:") || $0.hasPrefix("transcript:")}) else { throw APIError.message("AI returned invalid or unsupported citations; no handout was published") }
-            if kind=="supporting" && !citations.contains(where:{$0.hasPrefix("photo:") || $0.hasPrefix("resource:") || $0.hasPrefix("web:")}) { throw APIError.message("Supporting statement lacks resource evidence") }
+            if kind=="supporting" && !citations.contains(where:{$0.hasPrefix("photo:") || $0.hasPrefix("resource:") || $0.hasPrefix("web:") || $0.hasPrefix("link:")}) { throw APIError.message("Supporting statement lacks resource evidence") }
         }
     }
-    func discover(_ id: String,provider: String) async throws {
-        let course=try store.get("course",id),query=String(data:try encoded(course),encoding:.utf8)!
+    func discover(_ id: String,provider: String,question: String="") async throws {
+        let course=try store.get("course",id),query=String(data:try encoded(["course":course,"question":question]),encoding:.utf8)!
         var links=[[String:String]]();let output: String
         func add(_ url: String,_ title: String) { if let u=URL(string:url),u.scheme=="https",u.host != nil { links.append(["url":url,"title":title]) } }
         if provider=="gemini" {

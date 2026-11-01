@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "transport": "in-process on each device",
+  "operations": {
+    "GET /v1/sessions/{id}/chat": "Saved session-only messages; no API key or network required",
+    "POST /v1/sessions/{id}/chat": {
+      "body": {
+        "text": "1..4000 characters",
+        "provider": [
+          "gemini",
+          "openai",
+          "claude"
+        ],
+        "request_id": "optional stable retry ID, 1..80 ASCII letters/digits/hyphens",
+        "search": "optional boolean; explicit paid web search"
+      },
+      "response": "assistant message with content, provider, model, status, sources, links"
+    },
+    "DELETE /v1/sessions/{id}/chat": "Clear this conversation only",
+    "GET /v1/sessions/{id}/links": "Session-only HTTPS references and supplied excerpts",
+    "POST /v1/sessions/{id}/links": {
+      "body": {
+        "title": "required, up to160 characters",
+        "url": "HTTPS without embedded credentials",
+        "text": "optional excerpt up to20000 characters"
+      }
+    },
+    "DELETE /v1/links/{id}": "Delete reference and invalidate current handout"
+  },
+  "rules": [
+    "Original recordings and attachments are not changed by chat",
+    "Chats stay on this device; there is no cloud sync",
+    "Course resource attachments are shared within their course; transcripts and links belong to one session",
+    "Generate notes or save a transcript before chatting about an audio-only session",
+    "Assistant history is dialogue, not evidence",
+    "Binary PDFs/photos are included again per reply within the existing 30 MiB/20-photo limits",
+    "Use bounded text excerpts and the most recent 12 messages",
+    "Only exact supplied source IDs and source HTTPS URLs may be returned",
+    "A stable successful request_id returns the saved reply without another provider call"
+  ]
+}

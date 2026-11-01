@@ -6,6 +6,18 @@ A lecture companion for international students with native Kotlin/Compose Androi
 
 Successful pushes to `main` publish [development releases](https://github.com/RmaNMetaverse/SeviLLearnCompanion/releases) after web tests, Android emulator tests, iOS simulator tests and all builds pass. Downloads include an Android debug APK, an iOS simulator app, an **unsigned** iOS device IPA, and a runnable static web package. An unsigned IPA needs Apple signing/provisioning before installation. These are development builds, not app-store releases.
 
+## Study workspace and session chat
+
+All clients use the same green workspace structure: Overview, My courses, Lecture sessions and Settings. Phones show bottom navigation, medium screens a navigation rail, and large screens a sidebar. Each lecture has Notes, Chat, Transcript and Materials tabs. Shared colors and layout breakpoints are generated from `shared/design.json`; see [design rules](docs/DESIGN.md).
+
+Open a session's **Chat** tab to ask questions, request examples or practise the topic with Gemini, OpenAI or Claude. Save a transcript or generate notes first when the session contains only audio. Chat uses that session's transcript and photos, its course's attached resources, attached link excerpts and recent conversation. Messages are saved on this device. Changing provider does not erase the conversation. Replies distinguish lecture evidence from extra explanations, display checked source references, and expose only links that occur in supplied evidence or actual search results. A model's answer can still be mistaken.
+
+Add reference links in **Materials** with an optional pasted excerpt. A URL alone is a reference, not a fetched/read webpage. Enable **Search the web** per question for a separate provider search; this can add charges and require a paid provider account. Gemini's current free API tier does not include Google Search grounding for the configured model. No provider is substituted automatically.
+
+The tutor keeps the latest 12 messages and selects bounded text excerpts (up to 32,000 transcript characters and 12,000 per text resource). PDFs and photos are sent as attachments again per answer, up to 20 photos and 30 MiB total binary input. Large libraries can cost more than the example budget in [AI costs and proposed pricing](docs/AI-COSTS.md). Original recordings/files and full saved conversation remain intact. A failed saved question can be retried without creating duplicate messages. Keep the app/tab open until processing finishes; replies are not streamed or processed as background jobs. Clearing chat removes this session's dialogue without removing its recordings/materials.
+
+The current app uses personal provider keys; no subscription, shared commercial API key, quota billing or cloud sync is implemented. The prices in the cost document are proposals for a later metered service.
+
 ## Use Gemini on a phone
 
 Install the new APK, open **Settings**, paste your own Gemini API key into the Gemini field, and save. Select **Gemini** in the AI service dropdown. Courses, sessions, recording, photos and existing PDF exports work without a key or internet. Generating new AI notes and searching for public sources require internet and provider quota. No server URL or `adb reverse` is needed.

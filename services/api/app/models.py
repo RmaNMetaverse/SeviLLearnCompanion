@@ -44,3 +44,12 @@ class Handout(BaseModel):
     glossary: list[Term]
     questions: list[str]
     uncertainties: list[str]
+
+class ChatLink(BaseModel):
+    title: str
+    url: str
+
+class ChatReply(BaseModel):
+    answer: str
+    citations: list[str]
+    links: list[ChatLink]

@@ -51,3 +51,6 @@ struct PublicLink: Codable, Identifiable { let url: String; let title: String; v
 struct Discovery: Decodable { let links: [PublicLink]; let summary: String }
 let languages: [(String, String)] = [("en","English"),("tr","Türkçe"),("zh-Hans","简体中文"),("ja","日本語"),("ko","한국어"),("de","Deutsch"),("fr","Français"),("es","Español")]
 func clock(_ milliseconds: Int) -> String { String(format: "%02d:%02d", milliseconds / 60000, milliseconds / 1000 % 60) }
+
+struct SessionLink: Codable, Identifiable {let id: String;let title: String;let url: String;let text: String}
+struct ChatMessage: Codable, Identifiable {let id: String;let role: String;let content: String;let provider: String;let status: String;let request_id: String;let error: String?;let sources: [Source]?;let links: [PublicLink]?}

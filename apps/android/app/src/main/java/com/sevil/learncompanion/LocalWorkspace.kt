@@ -15,14 +15,16 @@ class LocalWorkspace private constructor(context: Context) {
     val store=DeviceStore(context)
     val keys=DeviceKeys(context)
     val ai=DeviceAI(context,keys)
+    val tutor=SessionTutor(store,ai,keys) { id,provider,question -> discover(id,provider,question) }
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     init { store.all("session").filter { it.optString("status")=="processing" }.forEach { store.save("session",it.put("status","failed").put("error","Processing was interrupted. Files are saved on this device; retry when ready.")) } }
     fun file(id: String)=store.file(id)
-    private fun editable(s: JSONObject) { require(s.optString("status")!="processing") { "Wait for processing to finish." } }
+    private fun editable(s: JSONObject) { check(!tutor.pending.contains(s.getString("id"))) { "Wait for the session tutor to finish." }; require(s.optString("status")!="processing") { "Wait for processing to finish." } }
     fun route(path: String,method: String,body: JSONObject?): String {
         val u=Uri.parse("https://device.invalid$path"); val parts=u.pathSegments; val v=body ?: JSONObject()
         if(path=="/health") return JSONObject().put("mode","live").put("ai_configured",listOf("gemini","openai","claude").any { keys.read(it).isNotBlank() }).toString()
         if(path=="/v1/providers") return JSONObject().put("default_provider","gemini").put("providers",JSONArray(listOf("openai","gemini","claude").map { JSONObject().put("id",it).put("label",mapOf("openai" to "OpenAI","gemini" to "Gemini","claude" to "Claude")[it]).put("configured",keys.read(it).isNotBlank()).put("audio_supported",it!="claude").put("model",ai.contract.getJSONObject("models").getString(it)) })).toString()
+        if(parts.getOrNull(1)=="links" && method=="DELETE") { val link=store.get("link",parts[2]);val session=store.get("session",link.getString("session_id"));editable(session);store.remove(link.getString("id"));store.invalidate(session);return "{}" }
         if(parts.getOrNull(1)=="courses") {
             if(parts.size==2) { if(method=="GET") return JSONArray(store.all("course")).toString(); require(v.optString("title").isNotBlank()) { "Enter a course title." }; listOf("university","degree","professor","code").forEach { if(!v.has(it)) v.put(it,"") }; listOf("lecture_language","output_language").forEach { if(!v.has(it)) v.put(it,"en") }; return store.save("course",v).toString() }
             val id=parts[2]; store.get("course",id); val provider=v.optString("provider",u.getQueryParameter("provider") ?: "gemini"); val key="$id:$provider"
@@ -32,8 +34,10 @@ class LocalWorkspace private constructor(context: Context) {
         if(parts.getOrNull(1)=="sessions") {
             if(parts.size==2) { if(method=="GET") return JSONArray(store.all("session")).toString(); store.get("course",v.getString("course_id")); require(v.optBoolean("recording_permission")) { "Confirm you have permission to record this class." }; require(v.optString("title").isNotBlank()); return store.save("session",v.put("status","draft").put("transcript","").put("handout",JSONObject.NULL).put("sources",JSONArray()).put("error",JSONObject.NULL)).toString() }
             val id=parts[2]; val s=store.get("session",id)
+            if(parts.getOrNull(3)=="chat") { if(method=="GET")return JSONArray(tutor.history(id)).toString();editable(s);if(method=="DELETE") {tutor.clear(id);return "{}"};return tutor.send(s,v).toString() }
+            if(parts.getOrNull(3)=="links") { if(method=="GET")return JSONArray(tutor.links(id)).toString();editable(s);return tutor.addLink(s,v).toString() }
             if(parts.size==3) {
-                if(method=="DELETE") { editable(s); store.all("asset").filter { it.optString("session_id")==id && it.getString("kind")!="resource" }.forEach { store.file(it.getString("id")).delete();store.remove(it.getString("id")) }; store.remove(id); return "{}" }
+                if(method=="DELETE") { editable(s); store.all("asset").filter { it.optString("session_id")==id && it.getString("kind")!="resource" }.forEach { store.file(it.getString("id")).delete();store.remove(it.getString("id")) }; tutor.removeSession(id);store.remove(id); return "{}" }
                 return s.put("assets",JSONArray(store.assets(s))).toString()
             }
             if(parts[3]=="transcript") { editable(s); require(v.optString("text").isNotBlank()); s.put("transcript",v.getString("text")).put("transcript_provider","manual").put("transcript_sources",JSONArray().put(JSONObject().put("id","transcript:manual").put("label","Student-edited transcript; audio timing not verified"))); store.invalidate(s);return s.toString() }
@@ -78,6 +82,7 @@ class LocalWorkspace private constructor(context: Context) {
                 sources.put(source)
             }
             val evidence=JSONObject().put("course",course).put("session_title",s.getString("title")).put("transcript",s.getString("transcript")).put("sources",sources)
+            tutor.links(id).forEach { l -> sources.put(JSONObject().put("id","link:"+l.getString("id")).put("label",l.getString("title")+" · "+l.getString("url")).put("text",l.optString("text"))) }
             val note=ai.note(provider,evidence,attachments);validateNote(note,sources)
             store.save("session",s.put("status","ready").put("handout",note).put("sources",sources).put("generated_provider",provider).put("generated_mode","live").put("error",JSONObject.NULL))
         } catch(e: Exception) { store.save("session",s.put("status","failed").put("error",e.message ?: "Processing failed; your files remain on this device.").put("handout",JSONObject.NULL)) }
@@ -88,11 +93,11 @@ class LocalWorkspace private constructor(context: Context) {
         listOf("title","summary").forEach { require(note.get(it) is String) }
         listOf("objectives","questions","uncertainties").forEach { key -> val a=note.getJSONArray(key);for(i in 0 until a.length()) require(a.get(i) is String) }
         note.getJSONArray("glossary").objects().forEach { t -> listOf("term","translation","definition").forEach { require(t.get(it) is String) } }
-        note.getJSONArray("sections").objects().forEach { t -> listOf("heading","body").forEach { require(t.get(it) is String) };if(t.getString("kind")=="supporting") require(t.getJSONArray("citations").strings().any { it.startsWith("photo:") || it.startsWith("resource:") || it.startsWith("web:") }) { "Supporting statement lacks resource evidence." } }
+        note.getJSONArray("sections").objects().forEach { t -> listOf("heading","body").forEach { require(t.get(it) is String) };if(t.getString("kind")=="supporting") require(t.getJSONArray("citations").strings().any { it.startsWith("photo:") || it.startsWith("resource:") || it.startsWith("web:") || it.startsWith("link:") }) { "Supporting statement lacks resource evidence." } }
         note.getJSONArray("sections").objects().forEach { section -> val citations=section.getJSONArray("citations").strings();val kind=section.getString("kind");require(kind in listOf("lecture","supporting","explanation"));require(citations.all { it in ids }) { "AI returned an unknown citation. Retry generation." };require(kind=="explanation" || citations.isNotEmpty()) { "AI omitted evidence." };require(kind!="lecture" || citations.any { it.startsWith("audio:") || it.startsWith("transcript:") }) { "Lecture statement lacks transcript evidence." } }
     }
-    fun discover(id: String,provider: String) {
-        val course=store.get("course",id);val query=course.toString();val links=JSONArray();val text: String
+    fun discover(id: String,provider: String,question: String="") {
+        val course=store.get("course",id);val query=JSONObject().put("course",course).put("question",question).toString();val links=JSONArray();val text: String
         fun add(url: String,title: String) { if(Uri.parse(url).scheme=="https" && !Uri.parse(url).host.isNullOrBlank()) links.put(JSONObject().put("url",url).put("title",title)) }
         if(provider=="gemini") { val result=ai.gemini(JSONArray().put(JSONObject().put("text",query)),ai.contract.getString("search_prompt"),search=true);text=ai.geminiText(result);result.getJSONArray("candidates").objects().forEach { c -> c.optJSONObject("groundingMetadata")?.optJSONArray("groundingChunks")?.objects()?.forEach { it.optJSONObject("web")?.let { web -> add(web.optString("uri"),web.optString("title")) } } } }
         else if(provider=="openai") { val r=ai.request(provider,"responses",JSONObject().put("model",ai.contract.getJSONObject("models").getString(provider)).put("store",false).put("instructions",ai.contract.getString("search_prompt")).put("input",query).put("tools",JSONArray().put(JSONObject().put("type","web_search"))));text=r.getJSONArray("output").objects().flatMap { it.optJSONArray("content")?.objects() ?: emptyList() }.joinToString("\n") { p -> p.optJSONArray("annotations")?.objects()?.filter { it.optString("type")=="url_citation" }?.forEach { add(it.optString("url"),it.optString("title")) };p.optString("text") } }

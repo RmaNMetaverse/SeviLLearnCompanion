@@ -16,6 +16,12 @@ All product changes must apply to native Android, native iOS and web. Device lib
 | PDF including photos | Android PdfDocument | UIGraphicsPDFRenderer/CoreText | Browser Print/Save as PDF |
 | Offline sample | Synthetic contract sample | Same sample | Same sample |
 | Eight interface languages | Shared catalog | Shared catalog | Shared catalog |
+| Green responsive workspace | Compose bottom nav / rail / sidebar | SwiftUI bottom nav / rail / sidebar | Responsive bottom nav / rail / sidebar |
+| Session tabs | Notes, Chat, Transcript, Materials | Same four | Same four |
+| Saved session tutor | Native local chat + direct provider | Native local chat + direct provider | IndexedDB chat + direct provider |
+| Link references and excerpts | Session-scoped, HTTPS validation | Same | Same |
+| Chat citations and verified links | Source-ID/URL checks, explicit search | Same | Same |
+| Retry and clear conversation | Stable request IDs, local history | Same | Same |
 | Cloud sync/account | Future | Future | Future |
 
 Native PDFs are generated as bytes; web opens a print dialog to save a PDF. Native clients check PDF page count; browser sends chapters without page count prevalidation. Other limits and interruption behavior are documented in README.
@@ -24,4 +30,6 @@ Native PDFs are generated as bytes; web opens a print dialog to save a PDF. Nati
 
 The new device-library change includes browser tests for offline CRUD, original bytes/timestamps, shared course resources, key preflight, direct Gemini requests and citation rejection. Android instrumentation and iOS simulator tests cover local persistence, file retention, PDF generation and secure credential storage. GitHub releases are gated on these tests and all builds.
 
-Local Windows Android build and web type/build/tests are checked before pushing. iOS requires GitHub's macOS runner; check the linked release workflow for its actual result. Simulator/emulator results do not establish physical-device microphone, camera, calls, background reliability or classroom accuracy. No physical device is connected to the development laptop during this change.
+For the 0.2 workspace/chat change, local Windows Android app and instrumentation-test APK compilation passed, as did web type checking, production export and all 10 browser-engine tests. New tests cover all three vendor request formats, session isolation, saved follow-ups, idempotent retry, link/citation rejection and bounded evidence. Native tests add session link/history cleanup and context validation; Android also exercises navigation/sample chat and exports UI screenshots.
+
+At the time of this milestone, the new native instrumentation/simulator tests and iOS compilation are pending CI, and responsive visual/live Gemini checks are still in progress. This statement must be updated with actual results after verification. No unbuilt platform is verified. Simulator/emulator results do not establish physical-device microphone, camera, calls, background reliability or classroom accuracy. No physical device is connected to the development laptop during this change.

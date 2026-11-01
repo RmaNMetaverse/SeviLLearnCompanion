@@ -1,4 +1,5 @@
 import contract from "../shared-ai-contract.json";
+import { relevantText, validHTTPS, validateChat } from "./chat-context";
 
 type Item = Record<string, any>;
 type Provider = "gemini" | "openai" | "claude";
@@ -77,7 +78,10 @@ async function assets(session: Item) {
       (a.kind === "resource" && a.course_id === session.course_id),
   );
 }
+const chatPending = new Set<string>();
 function editable(session: Item) {
+  if (chatPending.has(session.id))
+    throw Error("Wait for the session tutor to finish.");
   if (session.status === "processing")
     throw Error("Wait for processing to finish.");
 }
@@ -98,6 +102,14 @@ export async function assetBlob(id: string): Promise<Blob> {
 let ready: Promise<void> | undefined;
 function initialize() {
   return (ready ??= (async () => {
+    for (const message of await all("message"))
+      if (message.status === "pending")
+        await save("message", {
+          ...message,
+          status: "failed",
+          error:
+            "Reply interrupted. Your conversation is saved; retry the question.",
+        });
     for (const session of await all("session"))
       if (session.status === "processing")
         await save("session", {
@@ -180,17 +192,19 @@ async function gemini(
   instructions = "",
   schema = false,
   search = false,
+  responseSchema: Item = contract.schema,
+  maxTokens = 65536,
 ): Promise<Item> {
   const body: Item = {
     contents: [{ role: "user", parts }],
-    generationConfig: { maxOutputTokens: 65536 },
+    generationConfig: { maxOutputTokens: maxTokens },
   };
   if (instructions)
     body.systemInstruction = { parts: [{ text: instructions }] };
   if (schema)
     Object.assign(body.generationConfig, {
       responseMimeType: "application/json",
-      responseJsonSchema: contract.schema,
+      responseJsonSchema: responseSchema,
     });
   if (search) body.tools = [{ google_search: {} }];
   return remote(
@@ -327,13 +341,25 @@ async function makeNote(
   provider: Provider,
   evidence: Item,
   attachments: Item[],
+  chat = false,
 ) {
+  const instructions = chat ? contract.chat_prompt : contract.notes_prompt;
+  const schema = chat ? contract.chat_schema : contract.schema;
   const parts: Item[] = [{ text: JSON.stringify(evidence) }];
   for (const a of attachments)
     parts.push(await mediaPart(await assetBlob(a.id), a.mime));
   if (provider === "gemini")
     return JSON.parse(
-      geminiText(await gemini(parts, contract.notes_prompt, true)),
+      geminiText(
+        await gemini(
+          parts,
+          instructions,
+          true,
+          false,
+          schema,
+          chat ? 8192 : 65536,
+        ),
+      ),
     );
   const content = parts.map((p) => {
     if (p.text)
@@ -359,14 +385,14 @@ async function makeNote(
     const r = await remote(provider, "responses", {
       model: contract.models.openai,
       store: false,
-      instructions: contract.notes_prompt,
+      instructions,
       input: [{ role: "user", content }],
       text: {
         format: {
           type: "json_schema",
           name: "lecture_handout",
           strict: true,
-          schema: contract.schema,
+          schema,
         },
       },
     });
@@ -380,10 +406,10 @@ async function makeNote(
   }
   const r = await remote(provider, "messages", {
     model: contract.models.claude,
-    max_tokens: 16384,
-    system: contract.notes_prompt,
+    max_tokens: chat ? 4096 : 16384,
+    system: instructions,
     messages: [{ role: "user", content }],
-    output_config: { format: { type: "json_schema", schema: contract.schema } },
+    output_config: { format: { type: "json_schema", schema } },
   });
   if (r.stop_reason !== "end_turn") throw Error("Claude response incomplete");
   return JSON.parse(
@@ -432,7 +458,8 @@ export function validateNote(note: Item, sources: Item[]) {
           (r: string) =>
             r.startsWith("photo:") ||
             r.startsWith("resource:") ||
-            r.startsWith("web:"),
+            r.startsWith("web:") ||
+            r.startsWith("link:"),
         ))
     )
       throw Error(
@@ -517,6 +544,16 @@ async function generate(
       }
       sources.push(source);
     }
+    sources.push(
+      ...(await all("link"))
+        .filter((l) => l.session_id === s.id)
+        .map((l) => ({
+          id: `link:${l.id}`,
+          label: l.title + " · " + l.url,
+          text: l.text,
+          links: [{ url: l.url, title: l.title }],
+        })),
+    );
     const note = await makeNote(
       provider,
       { course, session_title: s.title, transcript: s.transcript, sources },
@@ -544,7 +581,7 @@ async function generate(
     });
   }
 }
-async function discover(course: Item, provider: Provider) {
+async function discover(course: Item, provider: Provider, question = "") {
   let summary = "",
     links: Item[] = [];
   const add = (url: string, title: string) => {
@@ -555,7 +592,7 @@ async function discover(course: Item, provider: Provider) {
   };
   if (provider === "gemini") {
     const r = await gemini(
-      [{ text: JSON.stringify(course) }],
+      [{ text: JSON.stringify({ course, question }) }],
       contract.search_prompt,
       false,
       true,
@@ -569,7 +606,7 @@ async function discover(course: Item, provider: Provider) {
       model: contract.models.openai,
       store: false,
       instructions: contract.search_prompt,
-      input: JSON.stringify(course),
+      input: JSON.stringify({ course, question }),
       tools: [{ type: "web_search" }],
     });
     for (const c of r.output.flatMap((i: Item) => i.content || [])) {
@@ -582,7 +619,9 @@ async function discover(course: Item, provider: Provider) {
       model: contract.models.claude,
       max_tokens: 8192,
       system: contract.search_prompt,
-      messages: [{ role: "user", content: JSON.stringify(course) }],
+      messages: [
+        { role: "user", content: JSON.stringify({ course, question }) },
+      ],
       tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
     });
     for (const c of r.content) {
@@ -679,6 +718,164 @@ async function upload(id: string, form: FormData) {
     await invalidate(kind === "audio" ? { ...target, transcript: "" } : target);
   return asset;
 }
+async function sendChat(session: Item, body: Item) {
+  editable(session);
+  const provider = (body.provider || "gemini") as Provider;
+  if (!["gemini", "openai", "claude"].includes(provider))
+    throw Error("Choose a supported AI service.");
+  requireKey(provider);
+  const question = String(body.text || "").trim(),
+    limits = contract.chat_limits;
+  if (!question || question.length > limits.question_chars)
+    throw Error("Enter a question under 4,000 characters.");
+  const requestId = String(body.request_id || crypto.randomUUID());
+  if (!/^[A-Za-z0-9-]{1,80}$/.test(requestId))
+    throw Error("Invalid request ID");
+  const prefix = `chat:${session.id}:${requestId}`,
+    existing = await get("message", prefix + ":assistant").catch(() => null);
+  if (existing) return existing;
+  const list = await assets(session);
+  if (!session.transcript && list.some((a) => a.kind === "audio"))
+    throw Error(
+      "Generate notes or save a transcript first to chat about the recording.",
+    );
+  if (
+    !session.transcript &&
+    !session.handout &&
+    !list.length &&
+    !(await all("link")).some((l) => l.session_id === session.id)
+  )
+    throw Error(
+      "Add a transcript or session materials before asking the tutor.",
+    );
+  const history = (await all("message"))
+    .filter((m) => m.session_id === session.id && m.status === "complete")
+    .reverse()
+    .slice(-limits.history_messages)
+    .map((m) => ({
+      role: m.role,
+      content: relevantText(m.content, question, limits.history_message_chars),
+    }));
+  chatPending.add(session.id);
+  let user: Item = {
+    id: prefix + ":user",
+    session_id: session.id,
+    role: "user",
+    content: question,
+    provider,
+    status: "pending",
+    request_id: requestId,
+  };
+  try {
+    user = await save("message", user);
+    const course = await get("course", session.course_id),
+      sources: Item[] = [],
+      attachments: Item[] = [];
+    for (const ref of session.transcript_sources || []) sources.push(ref);
+    if (session.transcript && !sources.length)
+      sources.push({
+        id: "transcript:manual",
+        label: "Student transcript; timing not verified",
+      });
+    let total = 0;
+    if (list.filter((a) => a.kind === "photo").length > 20)
+      throw Error("Split sessions with more than 20 board photos.");
+    for (const a of list.filter((a) => a.kind !== "audio")) {
+      const source: Item = {
+        id: a.kind === "photo" ? `photo:${a.id}` : `resource:${a.id}:1`,
+        label:
+          a.name +
+          (a.kind === "photo"
+            ? ` · captured at ${Math.floor(a.offset_ms / 1000)}s`
+            : ""),
+      };
+      if (a.mime === "text/plain")
+        source.text = relevantText(
+          await (await assetBlob(a.id)).text(),
+          question,
+          limits.text_resource_chars,
+        );
+      else {
+        total += a.size;
+        if (total > 30 * 1024 * 1024)
+          throw Error("Combined images/PDFs must be under 30 MiB.");
+        source.attachment_index = attachments.length;
+        attachments.push(a);
+      }
+      sources.push(source);
+    }
+    for (const link of (await all("link")).filter(
+      (l) => l.session_id === session.id,
+    ))
+      sources.push({
+        id: `link:${link.id}`,
+        label: link.title,
+        text: relevantText(
+          link.text || "",
+          question,
+          limits.text_resource_chars,
+        ),
+        links: [{ title: link.title, url: link.url }],
+      });
+    const found = body.search
+      ? await discover(course, provider, question)
+      : await get("discovery", `${course.id}:${provider}`).catch(() => null);
+    if (found?.links?.length)
+      sources.push({
+        id: `web:${course.id}`,
+        label: "Public web search; verify original links",
+        text: relevantText(found.summary, question, limits.text_resource_chars),
+        links: found.links,
+      });
+    const reply = await makeNote(
+      provider,
+      {
+        course,
+        session_title: session.title,
+        transcript: relevantText(
+          session.transcript || "",
+          question,
+          limits.transcript_chars,
+        ),
+        handout: session.handout,
+        history,
+        question,
+        sources,
+      },
+      attachments,
+      true,
+    );
+    validateChat(reply, sources);
+    const assistant = await save("message", {
+      id: prefix + ":assistant",
+      session_id: session.id,
+      role: "assistant",
+      content: reply.answer,
+      provider,
+      model: contract.models[provider],
+      status: "complete",
+      request_id: requestId,
+      sources: sources
+        .filter((s) => reply.citations.includes(s.id))
+        .map(({ id, label }) => ({ id, label })),
+      links: reply.links,
+    });
+    await save("message", { ...user, status: "complete" });
+    return assistant;
+  } catch (error) {
+    await save("message", {
+      ...user,
+      status: "failed",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Reply failed. Retry your question.",
+    });
+    throw error;
+  } finally {
+    chatPending.delete(session.id);
+  }
+}
 export async function localRequest(
   path: string,
   init: RequestInit = {},
@@ -688,6 +885,50 @@ export async function localRequest(
     parts = url.pathname.split("/").filter(Boolean),
     method = init.method || "GET",
     body = typeof init.body === "string" ? JSON.parse(init.body) : {};
+  if (parts[1] === "links" && method === "DELETE") {
+    const link = await get("link", parts[2]);
+    const session = await get("session", link.session_id);
+    editable(session);
+    await remove(link.id);
+    await invalidate(session);
+    return;
+  }
+  if (
+    parts[1] === "sessions" &&
+    parts.length === 4 &&
+    ["chat", "links"].includes(parts[3])
+  ) {
+    const session = await get("session", parts[2]);
+    if (parts[3] === "chat") {
+      if (method === "GET")
+        return (await all("message"))
+          .filter((m) => m.session_id === session.id)
+          .reverse();
+      if (method === "DELETE") {
+        editable(session);
+        for (const m of (await all("message")).filter(
+          (m) => m.session_id === session.id,
+        ))
+          await remove(m.id);
+        return;
+      }
+      return sendChat(session, body);
+    }
+    if (method === "GET")
+      return (await all("link")).filter((l) => l.session_id === session.id);
+    editable(session);
+    const url = validHTTPS(body.url);
+    if (!body.title?.trim() || String(body.text || "").length > 20000)
+      throw Error("Enter a link title and an excerpt under 20,000 characters.");
+    const link = await save("link", {
+      session_id: session.id,
+      title: body.title.trim().slice(0, 160),
+      url,
+      text: String(body.text || ""),
+    });
+    await invalidate(session);
+    return link;
+  }
   if (path === "/health")
     return { mode: "live", ai_configured: Object.values(keys).some(Boolean) };
   if (path === "/v1/providers")
@@ -751,6 +992,11 @@ export async function localRequest(
           await transaction("files", "readwrite", (f) => f.delete(a.id));
           await remove(a.id);
         }
+        for (const item of [
+          ...(await all("message")),
+          ...(await all("link")),
+        ].filter((m) => m.session_id === s.id))
+          await remove(item.id);
         await remove(s.id);
         return;
       }

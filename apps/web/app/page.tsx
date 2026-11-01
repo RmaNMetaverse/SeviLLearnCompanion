@@ -5,6 +5,9 @@ import {
   ArrowLeft,
   ArrowRight,
   AudioLines,
+  Search,
+  ListVideo,
+  MessageCircle,
   BookOpen,
   Camera,
   Check,
@@ -24,6 +27,9 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import SessionChat from "./session-chat";
+import SessionLinks from "./session-links";
+
 import catalog from "../shared-locales.json";
 import {
   localRequest,
@@ -80,7 +86,9 @@ export default function Home() {
   const [courses, setCourses] = useState<Course[]>([]),
     [sessions, setSessions] = useState<Session[]>([]),
     [active, setActive] = useState<Session | null>(null);
-  const [view, setView] = useState<"overview" | "courses">("overview"),
+  const [view, setView] = useState<"overview" | "courses" | "sessions">(
+      "overview",
+    ),
     [modal, setModal] = useState<"course" | "session" | "settings" | null>(
       null,
     );
@@ -88,13 +96,16 @@ export default function Home() {
     [courseId, setCourseId] = useState(""),
     [sessionTitle, setSessionTitle] = useState(""),
     [permission, setPermission] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [health, setHealth] = useState<{
       mode: string;
       ai_configured: boolean;
     } | null>(null);
-  const [tab, setTab] = useState<"notes" | "transcript" | "evidence">("notes"),
+  const [tab, setTab] = useState<"notes" | "chat" | "transcript" | "materials">(
+      "notes",
+    ),
     [text, setText] = useState("");
   const [recording, setRecording] = useState(false),
     [elapsed, setElapsed] = useState(0),
@@ -504,6 +515,17 @@ export default function Home() {
             {t("courses")}
             <span className="nav-count">{courses.length}</span>
           </button>
+          <button
+            className={!active && view === "sessions" ? "nav active" : "nav"}
+            disabled={recording}
+            onClick={() => {
+              setActive(null);
+              setView("sessions");
+            }}
+          >
+            <ListVideo size={19} />
+            {t("sessions")}
+          </button>
         </nav>
         <div className="sidebar-label courses-label">
           {t("courses")}
@@ -516,19 +538,25 @@ export default function Home() {
           </button>
         </div>
         <div className="course-nav">
-          {courses.map((c, i) => (
-            <button
-              key={c.id}
-              disabled={recording}
-              onClick={() => {
-                setCourseId(c.id);
-                setModal("session");
-              }}
-            >
-              <span className={`dot dot-${i % 3}`} />
-              <span>{c.title}</span>
-            </button>
-          ))}
+          {courses
+            .filter((c) =>
+              (c.title + " " + c.university + " " + c.professor)
+                .toLocaleLowerCase()
+                .includes(librarySearch.toLocaleLowerCase()),
+            )
+            .map((c, i) => (
+              <button
+                key={c.id}
+                disabled={recording}
+                onClick={() => {
+                  setCourseId(c.id);
+                  setModal("session");
+                }}
+              >
+                <span className={`dot dot-${i % 3}`} />
+                <span>{c.title}</span>
+              </button>
+            ))}
         </div>
         <div className="sidebar-bottom">
           <div className="quiet-card">
@@ -555,17 +583,28 @@ export default function Home() {
       <main>
         <header className="topbar">
           <div className="breadcrumb">
-            {t("workspace")}
+            <span className="mobile-brand">
+              <AudioLines size={21} />
+              SeviL
+            </span>
+            <span className="desktop-workspace">{t("workspace")}</span>
             <ChevronRight size={14} />
             <strong>{active ? active.title : t(view)}</strong>
           </div>
           <div className="topbar-right">
             <Globe2 size={17} />
             {langSelect(locale, (v) => setLocale(v as Locale))}
-            <span
-              className="status-dot"
-              title={health ? "Device library ready" : "Opening device library"}
-            />
+            <span className="local-badge">
+              <ShieldCheck size={14} />
+              {t("localBadge")}
+            </span>
+            <button
+              className="icon-button mobile-settings"
+              aria-label={t("settings")}
+              onClick={() => setModal("settings")}
+            >
+              <Settings size={20} />
+            </button>
           </div>
         </header>
         <div className="content">
@@ -583,67 +622,85 @@ export default function Home() {
               {t("demoNotice")}
             </div>
           )}
-          <section className="provider-bar" aria-label={t("aiProvider")}>
-            <label>
-              {t("aiProvider")}
-              <select
-                value={provider}
-                disabled={busy || recording || active?.status === "processing"}
-                onChange={(e) => {
-                  const p = e.target.value as Provider;
-                  setProvider(p);
-                  localStorage.setItem("sevil-provider", p);
-                }}
-              >
-                {(["openai", "gemini", "claude"] as Provider[]).map((p) => (
-                  <option key={p} value={p}>
-                    {
-                      { openai: "OpenAI", gemini: "Gemini", claude: "Claude" }[
-                        p
-                      ]
-                    }{" "}
-                    ·{" "}
-                    {t(
-                      providerInfo.find((info) => info.id === p)?.configured
-                        ? "configured"
-                        : "notConfigured",
-                    )}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {provider === "claude" && (
-              <label>
-                {t("audioProvider")}
-                <select
-                  value={audioProvider}
-                  disabled={
-                    busy || recording || active?.status === "processing"
-                  }
-                  onChange={(e) => {
-                    const p = e.target.value as "openai" | "gemini";
-                    setAudioProvider(p);
-                    localStorage.setItem("sevil-audio-provider", p);
-                  }}
-                >
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
-            )}
-            <p>
-              {t(
-                provider === "claude" ? "claudeAudioNotice" : "providerNotice",
-              )}
-            </p>
-          </section>
-          <p className="muted">{t("deviceStorageNotice")}</p>
+          {active && (
+            <details className="provider-disclosure">
+              <summary>
+                <Sparkles size={16} />
+                {
+                  { gemini: "Gemini", openai: "OpenAI", claude: "Claude" }[
+                    provider
+                  ]
+                }
+                <span>{t("aiProvider")}</span>
+              </summary>{" "}
+              <section className="provider-bar" aria-label={t("aiProvider")}>
+                <label>
+                  {t("aiProvider")}
+                  <select
+                    value={provider}
+                    disabled={
+                      busy || recording || active?.status === "processing"
+                    }
+                    onChange={(e) => {
+                      const p = e.target.value as Provider;
+                      setProvider(p);
+                      localStorage.setItem("sevil-provider", p);
+                    }}
+                  >
+                    {(["openai", "gemini", "claude"] as Provider[]).map((p) => (
+                      <option key={p} value={p}>
+                        {
+                          {
+                            openai: "OpenAI",
+                            gemini: "Gemini",
+                            claude: "Claude",
+                          }[p]
+                        }{" "}
+                        ·{" "}
+                        {t(
+                          providerInfo.find((info) => info.id === p)?.configured
+                            ? "configured"
+                            : "notConfigured",
+                        )}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {provider === "claude" && (
+                  <label>
+                    {t("audioProvider")}
+                    <select
+                      value={audioProvider}
+                      disabled={
+                        busy || recording || active?.status === "processing"
+                      }
+                      onChange={(e) => {
+                        const p = e.target.value as "openai" | "gemini";
+                        setAudioProvider(p);
+                        localStorage.setItem("sevil-audio-provider", p);
+                      }}
+                    >
+                      <option value="gemini">Gemini</option>
+                      <option value="openai">OpenAI</option>
+                    </select>
+                  </label>
+                )}
+                <p>
+                  {t(
+                    provider === "claude"
+                      ? "claudeAudioNotice"
+                      : "providerNotice",
+                  )}
+                </p>
+              </section>
+            </details>
+          )}
           {!active ? (
             <>
               <div className="page-heading">
                 <div>
                   <div className="eyebrow">SEVIL / {t("workspace")}</div>
-                  <h1>{view === "courses" ? t("courses") : t("welcome")}</h1>
+                  <h1>{view === "overview" ? t("welcome") : t(view)}</h1>
                   <p>{t("subtitle")}</p>
                 </div>
                 <button
@@ -700,37 +757,50 @@ export default function Home() {
                   </div>
                 </section>
               )}
-              <div className="stats">
-                <div>
-                  <span className="stat-icon teal">
-                    <BookOpen size={20} />
-                  </span>
+              {view === "overview" && (
+                <div className="stats">
                   <div>
-                    <strong>{courses.length}</strong>
-                    <span>{t("courses")}</span>
+                    <span className="stat-icon teal">
+                      <BookOpen size={20} />
+                    </span>
+                    <div>
+                      <strong>{courses.length}</strong>
+                      <span>{t("courses")}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="stat-icon lavender">
+                      <Mic size={20} />
+                    </span>
+                    <div>
+                      <strong>{sessions.length}</strong>
+                      <span>{t("sessions")}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="stat-icon peach">
+                      <FileText size={20} />
+                    </span>
+                    <div>
+                      <strong>
+                        {sessions.filter((s) => s.status === "ready").length}
+                      </strong>
+                      <span>{t("notes")}</span>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <span className="stat-icon lavender">
-                    <Mic size={20} />
-                  </span>
-                  <div>
-                    <strong>{sessions.length}</strong>
-                    <span>{t("sessions")}</span>
-                  </div>
-                </div>
-                <div>
-                  <span className="stat-icon peach">
-                    <FileText size={20} />
-                  </span>
-                  <div>
-                    <strong>
-                      {sessions.filter((s) => s.status === "ready").length}
-                    </strong>
-                    <span>{t("notes")}</span>
-                  </div>
-                </div>
-              </div>
+              )}
+              {view !== "overview" && (
+                <label className="library-search">
+                  <Search size={19} />
+                  <input
+                    aria-label={t("searchLibrary")}
+                    placeholder={t("searchLibrary")}
+                    value={librarySearch}
+                    onChange={(e) => setLibrarySearch(e.target.value)}
+                  />
+                </label>
+              )}
               {view === "courses" ? (
                 <>
                   <div className="section-heading">
@@ -744,40 +814,46 @@ export default function Home() {
                     </button>
                   </div>
                   <div className="course-grid">
-                    {courses.map((c, i) => (
-                      <article className="course-card" key={c.id}>
-                        <span
-                          className={`stat-icon ${["teal", "lavender", "peach"][i % 3]}`}
-                        >
-                          <BookOpen size={23} />
-                        </span>
-                        <small>{c.code || c.university}</small>
-                        <h3>{c.title}</h3>
-                        <p>{c.professor}</p>
-                        <div>
-                          {languages[c.lecture_language as Locale]}
-                          <ArrowRight size={14} />
-                          {languages[c.output_language as Locale]}
-                        </div>
-                        <button
-                          className="text-button"
-                          onClick={() => {
-                            setCourseId(c.id);
-                            setModal("session");
-                          }}
-                        >
-                          {t("newSession")}
-                          <Plus size={16} />
-                        </button>
-                      </article>
-                    ))}
+                    {courses
+                      .filter((c) =>
+                        (c.title + " " + c.university + " " + c.professor)
+                          .toLocaleLowerCase()
+                          .includes(librarySearch.toLocaleLowerCase()),
+                      )
+                      .map((c, i) => (
+                        <article className="course-card" key={c.id}>
+                          <span
+                            className={`stat-icon ${["teal", "lavender", "peach"][i % 3]}`}
+                          >
+                            <BookOpen size={23} />
+                          </span>
+                          <small>{c.code || c.university}</small>
+                          <h3>{c.title}</h3>
+                          <p>{c.professor}</p>
+                          <div>
+                            {languages[c.lecture_language as Locale]}
+                            <ArrowRight size={14} />
+                            {languages[c.output_language as Locale]}
+                          </div>
+                          <button
+                            className="text-button"
+                            onClick={() => {
+                              setCourseId(c.id);
+                              setModal("session");
+                            }}
+                          >
+                            {t("newSession")}
+                            <Plus size={16} />
+                          </button>
+                        </article>
+                      ))}
                   </div>
                 </>
               ) : (
                 <>
                   <div className="section-heading">
                     <h2>
-                      {t("sessions")}
+                      {t(view === "overview" ? "recentSessions" : "sessions")}
                       <span>{sessions.length}</span>
                     </h2>
                     <button
@@ -810,31 +886,46 @@ export default function Home() {
                         </button>
                       </div>
                     ) : (
-                      sessions.map((s) => (
-                        <button
-                          className="session-row"
-                          key={s.id}
-                          onClick={() => action(() => openSession(s.id))}
-                        >
-                          <span className="session-icon">
-                            <FileText size={21} />
-                          </span>
-                          <div className="session-info">
-                            <strong>{s.title}</strong>
-                            <small>
-                              {courses.find((c) => c.id === s.course_id)?.title}{" "}
-                              <span>·</span>{" "}
-                              {new Date(s.created_at).toLocaleDateString(
-                                locale,
-                              )}
-                            </small>
-                          </div>
-                          <span className={`badge ${s.status}`}>
-                            {t(s.status)}
-                          </span>
-                          <ChevronRight size={18} />
-                        </button>
-                      ))
+                      sessions
+                        .filter((s) =>
+                          (
+                            s.title +
+                            " " +
+                            (courses.find((c) => c.id === s.course_id)?.title ||
+                              "")
+                          )
+                            .toLocaleLowerCase()
+                            .includes(librarySearch.toLocaleLowerCase()),
+                        )
+                        .slice(0, view === "overview" ? 3 : undefined)
+                        .map((s) => (
+                          <button
+                            className="session-row"
+                            key={s.id}
+                            onClick={() => action(() => openSession(s.id))}
+                          >
+                            <span className="session-icon">
+                              <FileText size={21} />
+                            </span>
+                            <div className="session-info">
+                              <strong>{s.title}</strong>
+                              <small>
+                                {
+                                  courses.find((c) => c.id === s.course_id)
+                                    ?.title
+                                }{" "}
+                                <span>·</span>{" "}
+                                {new Date(s.created_at).toLocaleDateString(
+                                  locale,
+                                )}
+                              </small>
+                            </div>
+                            <span className={`badge ${s.status}`}>
+                              {t(s.status)}
+                            </span>
+                            <ChevronRight size={18} />
+                          </button>
+                        ))
                     )}
                   </div>
                 </>
@@ -958,11 +1049,19 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <div className="work-grid">
+              <div className="session-workspace">
                 <div className="study-panel">
-                  <div className="tabs">
-                    {(["notes", "transcript", "evidence"] as const).map((v) => (
+                  <div
+                    className="tabs"
+                    role="tablist"
+                    aria-label={t("workspace")}
+                  >
+                    {(
+                      ["notes", "chat", "transcript", "materials"] as const
+                    ).map((v) => (
                       <button
+                        role="tab"
+                        aria-selected={tab === v}
                         className={tab === v ? "selected" : ""}
                         key={v}
                         onClick={() => setTab(v)}
@@ -971,6 +1070,60 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
+                  {tab === "notes" && (
+                    <div className="note-actions">
+                      <div className="panel">
+                        <span className="panel-icon">
+                          <Sparkles size={22} />
+                        </span>
+                        <h3>{t("notes")}</h3>
+                        <p>
+                          {currentCourse &&
+                            languages[
+                              currentCourse.lecture_language as Locale
+                            ]}{" "}
+                          →{" "}
+                          {currentCourse &&
+                            languages[currentCourse.output_language as Locale]}
+                        </p>
+                        <button
+                          className="primary full"
+                          disabled={disabled || recording || pending.length > 0}
+                          onClick={() =>
+                            action(async () => {
+                              await request(
+                                `/v1/sessions/${active.id}/generate`,
+                                {
+                                  method: "POST",
+                                  body: JSON.stringify(generationOptions()),
+                                },
+                              );
+                              await openSession(active.id);
+                            })
+                          }
+                        >
+                          {active.status === "processing" ? (
+                            <Loader2 className="spin" size={17} />
+                          ) : (
+                            <Sparkles size={17} />
+                          )}{" "}
+                          {t(
+                            active.status === "processing"
+                              ? "processing"
+                              : "generate",
+                          )}
+                        </button>
+                        <button
+                          className="secondary full"
+                          disabled={!active.handout || disabled}
+                          onClick={() => action(download)}
+                        >
+                          <ArrowDownToLine size={17} />
+                          {t("download")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {active.error && (
                     <div className="inline-error">{active.error}</div>
                   )}
@@ -1059,6 +1212,15 @@ export default function Home() {
                         </div>
                       )}
                     </>
+                  ) : tab === "chat" ? (
+                    <SessionChat
+                      key={active.id}
+                      id={active.id}
+                      provider={provider}
+                      disabled={disabled || recording}
+                      t={t}
+                      onSources={() => setTab("materials")}
+                    />
                   ) : tab === "transcript" ? (
                     <div className="transcript-editor">
                       <label htmlFor="transcript">{t("transcript")}</label>
@@ -1085,260 +1247,259 @@ export default function Home() {
                       </button>
                     </div>
                   ) : (
-                    <div className="evidence-list">
-                      {(active.assets || [])
-                        .filter((a) => a.kind !== "resource")
-                        .map((a) => (
-                          <div key={a.id} className="evidence-card">
-                            {a.kind === "photo" && mediaUrls[a.id] && (
-                              <img
-                                src={mediaUrls[a.id]}
-                                alt={`${t("photo")} ${time(a.offset_ms)}`}
-                              />
-                            )}
-                            <strong>{a.name}</strong>
-                            <span>{time(a.offset_ms)}</span>
-                            {a.kind === "audio" && mediaUrls[a.id] && (
-                              <audio controls src={mediaUrls[a.id]} />
-                            )}
-                            <button
-                              className="icon-button"
-                              aria-label={t("delete")}
-                              disabled={disabled || recording}
-                              onClick={() =>
-                                action(async () => {
-                                  await request(`/v1/assets/${a.id}`, {
-                                    method: "DELETE",
-                                  });
-                                  await openSession(active.id);
-                                })
-                              }
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
+                    <>
+                      <div className="evidence-list">
+                        {(active.assets || [])
+                          .filter((a) => a.kind !== "resource")
+                          .map((a) => (
+                            <div key={a.id} className="evidence-card">
+                              {a.kind === "photo" && mediaUrls[a.id] && (
+                                <img
+                                  src={mediaUrls[a.id]}
+                                  alt={`${t("photo")} ${time(a.offset_ms)}`}
+                                />
+                              )}
+                              <strong>{a.name}</strong>
+                              <span>{time(a.offset_ms)}</span>
+                              {a.kind === "audio" && mediaUrls[a.id] && (
+                                <audio controls src={mediaUrls[a.id]} />
+                              )}
+                              <button
+                                className="icon-button"
+                                aria-label={t("delete")}
+                                disabled={disabled || recording}
+                                onClick={() =>
+                                  action(async () => {
+                                    await request(`/v1/assets/${a.id}`, {
+                                      method: "DELETE",
+                                    });
+                                    await openSession(active.id);
+                                  })
+                                }
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          ))}
+                        {active.sources?.map((s) => (
+                          <p className="source-ref" key={s.id}>
+                            {s.label}
+                          </p>
                         ))}
-                      {active.sources?.map((s) => (
-                        <p className="source-ref" key={s.id}>
-                          {s.label}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <aside className="session-sidebar">
-                  <div className="panel">
-                    <span className="panel-icon">
-                      <Sparkles size={22} />
-                    </span>
-                    <h3>{t("notes")}</h3>
-                    <p>
-                      {currentCourse &&
-                        languages[
-                          currentCourse.lecture_language as Locale
-                        ]}{" "}
-                      →{" "}
-                      {currentCourse &&
-                        languages[currentCourse.output_language as Locale]}
-                    </p>
-                    <button
-                      className="primary full"
-                      disabled={disabled || recording || pending.length > 0}
-                      onClick={() =>
-                        action(async () => {
-                          await request(`/v1/sessions/${active.id}/generate`, {
-                            method: "POST",
-                            body: JSON.stringify(generationOptions()),
-                          });
-                          await openSession(active.id);
-                        })
-                      }
-                    >
-                      {active.status === "processing" ? (
-                        <Loader2 className="spin" size={17} />
-                      ) : (
-                        <Sparkles size={17} />
-                      )}{" "}
-                      {t(
-                        active.status === "processing"
-                          ? "processing"
-                          : "generate",
-                      )}
-                    </button>
-                    <button
-                      className="secondary full"
-                      disabled={!active.handout || disabled}
-                      onClick={() => action(download)}
-                    >
-                      <ArrowDownToLine size={17} />
-                      {t("download")}
-                    </button>
-                  </div>
-                  <div className="panel">
-                    <h3>
-                      <BookOpen size={18} />
-                      {t("resources")}
-                    </h3>
-                    {(active.assets || [])
-                      .filter((a) => a.kind === "resource")
-                      .map((a) => (
-                        <div className="resource" key={a.id}>
-                          <FileText size={16} />
-                          <span>{a.name}</span>
+                      </div>
+                      <div className="material-grid">
+                        {" "}
+                        <div className="panel">
+                          <h3>
+                            <BookOpen size={18} />
+                            {t("resources")}
+                          </h3>
+                          {(active.assets || [])
+                            .filter((a) => a.kind === "resource")
+                            .map((a) => (
+                              <div className="resource" key={a.id}>
+                                <FileText size={16} />
+                                <span>{a.name}</span>
+                                <button
+                                  disabled={disabled || recording}
+                                  className="icon-button"
+                                  aria-label={t("delete")}
+                                  onClick={() =>
+                                    action(async () => {
+                                      await request(`/v1/assets/${a.id}`, {
+                                        method: "DELETE",
+                                      });
+                                      await openSession(active.id);
+                                    })
+                                  }
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          <label
+                            className={`upload-button ${disabled ? "disabled" : ""}`}
+                          >
+                            <Plus size={16} />
+                            {t("attach")}
+                            <input
+                              type="file"
+                              accept=".pdf,.txt,.md"
+                              disabled={disabled}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) action(() => upload(f, "resource"));
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                          <div className="upload-extra">
+                            <label className="text-button">
+                              <Upload size={14} />
+                              {t("uploadAudio")}
+                              <input
+                                type="file"
+                                accept="audio/*,.m4a,.webm"
+                                disabled={disabled || recording}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f)
+                                    action(() =>
+                                      upload(f, "audio", undefined, audioEnd),
+                                    );
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                            <label className="text-button">
+                              <Camera size={14} />
+                              {t("photo")}
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                disabled={disabled}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f)
+                                    action(() =>
+                                      upload(
+                                        f,
+                                        "photo",
+                                        undefined,
+                                        recording
+                                          ? baseOffset.current +
+                                              performance.now() -
+                                              startTime.current
+                                          : elapsed,
+                                      ),
+                                    );
+                                  e.target.value = "";
+                                }}
+                              />
+                            </label>
+                            {!recording && (
+                              <label className="offset-label">
+                                {t("photoOffset")}
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={Math.floor(elapsed / 1000)}
+                                  onChange={(e) =>
+                                    setElapsed(
+                                      Math.max(
+                                        0,
+                                        Number(e.target.value) * 1000,
+                                      ),
+                                    )
+                                  }
+                                />
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                        <div className="panel">
+                          <h3>{t("publicSources")}</h3>
+                          <p>{t("sourceNotice")}</p>
+                          {publicSources.map((source) => (
+                            <a
+                              className="public-source"
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              key={source.url}
+                            >
+                              {source.title}
+                              <ArrowRight size={12} />
+                            </a>
+                          ))}
                           <button
-                            disabled={disabled || recording}
-                            className="icon-button"
-                            aria-label={t("delete")}
+                            className="secondary full"
+                            disabled={
+                              disabled || recording || health?.mode === "demo"
+                            }
                             onClick={() =>
                               action(async () => {
-                                await request(`/v1/assets/${a.id}`, {
-                                  method: "DELETE",
+                                const found = await request<{
+                                  links: { url: string; title: string }[];
+                                }>(`/v1/courses/${active.course_id}/discover`, {
+                                  method: "POST",
+                                  body: JSON.stringify({ provider }),
                                 });
-                                await openSession(active.id);
+                                setPublicSources(found.links);
                               })
                             }
                           >
-                            <X size={14} />
+                            {t("discover")}
                           </button>
                         </div>
-                      ))}
-                    <label
-                      className={`upload-button ${disabled ? "disabled" : ""}`}
-                    >
-                      <Plus size={16} />
-                      {t("attach")}
-                      <input
-                        type="file"
-                        accept=".pdf,.txt,.md"
-                        disabled={disabled}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) action(() => upload(f, "resource"));
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                    <div className="upload-extra">
-                      <label className="text-button">
-                        <Upload size={14} />
-                        {t("uploadAudio")}
-                        <input
-                          type="file"
-                          accept="audio/*,.m4a,.webm"
+                        <button
+                          className="text-button delete-session"
                           disabled={disabled || recording}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f)
-                              action(() =>
-                                upload(f, "audio", undefined, audioEnd),
-                              );
-                            e.target.value = "";
+                          onClick={() => {
+                            if (confirm(t("deleteConfirm")))
+                              action(async () => {
+                                await request(`/v1/sessions/${active.id}`, {
+                                  method: "DELETE",
+                                });
+                                for (const clip of pending)
+                                  await removeClip(clip.id);
+                                setPending([]);
+                                setActive(null);
+                                await refresh();
+                              });
                           }}
+                        >
+                          <Trash2 size={15} />
+                          {t("delete")}
+                        </button>
+                        <SessionLinks
+                          key={active.id}
+                          id={active.id}
+                          t={t}
+                          disabled={disabled || recording}
+                          onSave={() => openSession(active.id)}
                         />
-                      </label>
-                      <label className="text-button">
-                        <Camera size={14} />
-                        {t("photo")}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          disabled={disabled}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f)
-                              action(() =>
-                                upload(
-                                  f,
-                                  "photo",
-                                  undefined,
-                                  recording
-                                    ? baseOffset.current +
-                                        performance.now() -
-                                        startTime.current
-                                    : elapsed,
-                                ),
-                              );
-                            e.target.value = "";
-                          }}
-                        />
-                      </label>
-                      {!recording && (
-                        <label className="offset-label">
-                          {t("photoOffset")}
-                          <input
-                            type="number"
-                            min="0"
-                            value={Math.floor(elapsed / 1000)}
-                            onChange={(e) =>
-                              setElapsed(
-                                Math.max(0, Number(e.target.value) * 1000),
-                              )
-                            }
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                  <div className="panel">
-                    <h3>{t("publicSources")}</h3>
-                    <p>{t("sourceNotice")}</p>
-                    {publicSources.map((source) => (
-                      <a
-                        className="public-source"
-                        href={source.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        key={source.url}
-                      >
-                        {source.title}
-                        <ArrowRight size={12} />
-                      </a>
-                    ))}
-                    <button
-                      className="secondary full"
-                      disabled={
-                        disabled || recording || health?.mode === "demo"
-                      }
-                      onClick={() =>
-                        action(async () => {
-                          const found = await request<{
-                            links: { url: string; title: string }[];
-                          }>(`/v1/courses/${active.course_id}/discover`, {
-                            method: "POST",
-                            body: JSON.stringify({ provider }),
-                          });
-                          setPublicSources(found.links);
-                        })
-                      }
-                    >
-                      {t("discover")}
-                    </button>
-                  </div>
-                  <button
-                    className="text-button delete-session"
-                    disabled={disabled || recording}
-                    onClick={() => {
-                      if (confirm(t("deleteConfirm")))
-                        action(async () => {
-                          await request(`/v1/sessions/${active.id}`, {
-                            method: "DELETE",
-                          });
-                          for (const clip of pending) await removeClip(clip.id);
-                          setPending([]);
-                          setActive(null);
-                          await refresh();
-                        });
-                    }}
-                  >
-                    <Trash2 size={15} />
-                    {t("delete")}
-                  </button>
-                </aside>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </>
           )}
         </div>
       </main>
+      <nav className="bottom-nav" aria-label={t("workspace")}>
+        {(["overview", "courses", "sessions", "settings"] as const).map(
+          (key, i) => {
+            const Icon = [LayoutDashboard, BookOpen, ListVideo, Settings][i];
+            return (
+              <button
+                key={key}
+                className={
+                  key === "settings"
+                    ? modal === "settings"
+                      ? "active"
+                      : ""
+                    : !active && view === key
+                      ? "active"
+                      : ""
+                }
+                disabled={recording}
+                onClick={() => {
+                  if (key === "settings") setModal("settings");
+                  else {
+                    setActive(null);
+                    setView(key);
+                  }
+                }}
+              >
+                <Icon size={22} />
+                <span>{t(key)}</span>
+              </button>
+            );
+          },
+        )}
+      </nav>
       {modal && (
         <div className="modal-backdrop">
           <section
@@ -1444,6 +1605,73 @@ export default function Home() {
                 </>
               ) : (
                 <>
+                  <h3>{t("aiSettings")}</h3>{" "}
+                  <section
+                    className="provider-bar"
+                    aria-label={t("aiProvider")}
+                  >
+                    <label>
+                      {t("aiProvider")}
+                      <select
+                        value={provider}
+                        disabled={
+                          busy || recording || active?.status === "processing"
+                        }
+                        onChange={(e) => {
+                          const p = e.target.value as Provider;
+                          setProvider(p);
+                          localStorage.setItem("sevil-provider", p);
+                        }}
+                      >
+                        {(["openai", "gemini", "claude"] as Provider[]).map(
+                          (p) => (
+                            <option key={p} value={p}>
+                              {
+                                {
+                                  openai: "OpenAI",
+                                  gemini: "Gemini",
+                                  claude: "Claude",
+                                }[p]
+                              }{" "}
+                              ·{" "}
+                              {t(
+                                providerInfo.find((info) => info.id === p)
+                                  ?.configured
+                                  ? "configured"
+                                  : "notConfigured",
+                              )}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                    </label>
+                    {provider === "claude" && (
+                      <label>
+                        {t("audioProvider")}
+                        <select
+                          value={audioProvider}
+                          disabled={
+                            busy || recording || active?.status === "processing"
+                          }
+                          onChange={(e) => {
+                            const p = e.target.value as "openai" | "gemini";
+                            setAudioProvider(p);
+                            localStorage.setItem("sevil-audio-provider", p);
+                          }}
+                        >
+                          <option value="gemini">Gemini</option>
+                          <option value="openai">OpenAI</option>
+                        </select>
+                      </label>
+                    )}
+                    <p>
+                      {t(
+                        provider === "claude"
+                          ? "claudeAudioNotice"
+                          : "providerNotice",
+                      )}
+                    </p>
+                  </section>
                   <label>
                     {t("language")}
                     {langSelect(locale, (v) => setLocale(v as Locale))}
