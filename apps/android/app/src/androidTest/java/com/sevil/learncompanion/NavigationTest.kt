@@ -3,20 +3,24 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.*
 import androidx.compose.ui.graphics.asAndroidBitmap
 import android.graphics.Bitmap
+import android.content.ContentValues
+import android.os.Environment
+import android.provider.MediaStore
 import org.junit.Rule
 import org.junit.Test
-import java.io.File
-import androidx.test.platform.app.InstrumentationRegistry
-import android.os.ParcelFileDescriptor
 
 class NavigationTest {
     @get:Rule val compose=createAndroidComposeRule<MainActivity>()
     private fun screenshot(name: String) {
-        val file=File(compose.activity.getExternalFilesDir(null),name)
-        file.outputStream().use {compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
-        // Gradle removes the test app after connected tests, so retain previews outside its directory.
-        val command="mkdir -p /sdcard/Download/sevil-ui && cp '${file.absolutePath}' '/sdcard/Download/sevil-ui/$name'"
-        ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).use {it.readBytes()}
+        // MediaStore keeps the preview when Gradle uninstalls the tested app.
+        val resolver=compose.activity.contentResolver
+        val values=ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME,name)
+            put(MediaStore.MediaColumns.MIME_TYPE,"image/png")
+            put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_DOWNLOADS+"/sevil-ui")
+        }
+        val uri=resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values) ?: error("Could not retain UI preview")
+        resolver.openOutputStream(uri)!!.use {compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
     }
     @Test fun phoneNavigationAndClassroomChatAreReachable() {
         compose.waitForIdle();screenshot("ui-home.png")
