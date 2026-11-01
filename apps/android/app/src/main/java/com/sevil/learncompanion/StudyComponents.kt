@@ -60,7 +60,7 @@ import java.util.UUID
         scope.launch {try {api.json("/v1/sessions/$id/chat","POST",JSONObject().put("provider",provider).put("text",text).put("search",search).put("request_id",token));draft="";request=null} catch(e: Exception) {error=e.message ?: t("error")} finally {runCatching {load()};sending=false;onBusy(false)} }
     }
     LaunchedEffect(id) {runCatching {load()}.onFailure {error=it.message ?: t("error")}}
-    LaunchedEffect(messages.size,sending) {scroll.animateScrollTo(scroll.maxValue)}
+    LaunchedEffect(messages.size,sending) {if(messages.isNotEmpty() || sending)scroll.animateScrollTo(scroll.maxValue)}
     Surface(color=Color.White,shape=RoundedCornerShape(20.dp),border=BorderStroke(1.dp,Design.line)) {Column(Modifier.fillMaxWidth().height(640.dp)) {
         Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {Box(Modifier.size(42.dp).background(Design.mint,RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {Icon(Icons.Outlined.AutoAwesome,null,tint=Design.primary)};Column(Modifier.weight(1f)) {Text(t("sessionTutor"),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold);Text(t("chatNotice"),style=MaterialTheme.typography.labelSmall,color=Design.muted)};IconButton(enabled=!sending&&!disabled&&messages.isNotEmpty(),onClick={clear=true}) {Icon(Icons.Outlined.DeleteOutline,t("clearChat"),modifier=Modifier.size(18.dp))}}
         HorizontalDivider(color=Design.line)
