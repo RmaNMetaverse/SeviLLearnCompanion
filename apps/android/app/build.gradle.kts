@@ -2,6 +2,15 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android"); id(
 android {
     namespace = "com.sevil.learncompanion"
     compileSdk = 35
+    val stableDebugKey = System.getenv("SEVIL_DEBUG_KEYSTORE")
+    if (!stableDebugKey.isNullOrBlank()) {
+        signingConfigs.getByName("debug") {
+            storeFile = file(stableDebugKey)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
     defaultConfig { applicationId = "com.sevil.learncompanion"; minSdk = 26; targetSdk = 35; versionCode = providers.environmentVariable("SEVIL_BUILD_NUMBER").orElse("1").get().toInt(); versionName = "0.2.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     buildFeatures { compose = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

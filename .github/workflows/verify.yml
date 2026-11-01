@@ -81,6 +81,7 @@ jobs:
       - run: apps/android/gradlew -p apps/android assembleDebug --console=plain
         env:
           SEVIL_BUILD_NUMBER: ${{ github.run_number }}
+          SEVIL_DEBUG_KEYSTORE: /home/runner/.android/debug.keystore
       - name: Verify stable Android update certificate
         if: github.event_name == 'push'
         run: |
